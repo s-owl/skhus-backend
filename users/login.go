@@ -46,42 +46,78 @@ func Login(c *gin.Context) {
 	samCtx, _ := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
 	defer cancel()
 
-	credentialOld := make(chan string)
-	credentialNew := make(chan string)
-	credentialNewToken := make(chan string)
-	loginError := make(chan string)
+	credentialOldChan := make(chan string)
+	credentialNewChan := make(chan string)
+	credentialNewTokenChan := make(chan string)
+	loginErrorChan := make(chan string)
 
 	// chromedp.Run(forestCtx, loginOnForest(loginData.Userid, loginData.Userpw, credentialOld, loginError))
 	// chromedp.Run(samCtx, loginOnSam(loginData.Userid, loginData.Userpw, credentialNew, credentialNewToken, loginError))
-	go loginOnForest(forestCtx, &loginData, credentialOld, loginError)
-	go loginOnSam(samCtx, &loginData, credentialNew, credentialNewToken, loginError)
+	go loginOnForest(forestCtx, &loginData, credentialOldChan, loginErrorChan)
+	go loginOnSam(samCtx, &loginData, credentialNewChan, credentialNewTokenChan, loginErrorChan)
 
-	// for {
-	// 	select {}
-	// }
+	for {
+		select {
+			case errorMsg := <- loginErrorChan:
+			c.String(http.StatusUnauthorized, errorMsg)
+			return
+			case <- credentialOldChan:
+			case <- credentialNewChan:
+			case <- credentialNewTokenChan:
+		}
+	}
 }
 
 func loginOnForest(ctx context.Context, loginData *LoginData,
 	credentialOld chan string, loginError chan string) chromedp.Tasks {
+	loginPageUrl := fmt.Sprintf("%s/Gate/UniLogin.aspx", consts.ForestUrl)
+	agreementPageUrl := fmt.Sprintf("%s/Gate/CORE/P/CORP02P.aspx", consts.ForestUrl)
+	mainPageUrl := fmt.Sprintf("%s/Gate/UniMyMain.aspx", consts.ForestUrl)
+	triedLogin := false
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		if ev, ok := ev.(*page.EventFrameNavigated); ok {
-			fmt.Println("closing alert:", ev.Message)
-			go func() {
-				if err := chromedp.Run(ctx,
-					page.HandleJavaScriptDialog(true),
-				); err != nil {
-					panic(err)
+			fmt.Println("Page URL", ev.Frame.URLFragment)
+			switch ev.Frame.URLFragment{
+			case loginPageUrl:
+				if(!triedLogin){
+					triedLogin = true
+				}else{
+					errorMsg := `Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
+											로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+					loginError <- errorMsg
+					break
 				}
-			}()
+				case agreementPageUrl:
+					errorMsg := `Please complete the privacy policy agreement on forest.skhu.ac.kr
+											forest.skhu.ac.kr 에서 개인정보 제공 동의를 먼저 완료해 주세요.`
+					loginError <- errorMsg
+					break
+				case mainPageUrl:
+					chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+						cookies, err := network.GetAllCookies().Do(ctx)
+						if err != nil {
+							return err
+						}
+						
+						buf := bytes.Buffer
+
+						for i, cookie := range cookies {
+							buf.WriteString(fmt.Sprintf("%s\%s;", cookie.Name, cookie.Value))
+						}
+						
+						credentialOld <- buf.String()
+					}))
+			}
 		}
 	})
 
 	chromedp.Run(ctx, chromedp.Tasks{
-		chromedp.Navigate(fmt.Sprintf("%s}/Gate/UniLogin.aspx", consts.ForestUrl)),
+		chromedp.Navigate(loginPageUrl),
 		chromedp.WaitReady(`#txtID`),
-		chromedp.SendKeys(`#txtID`, loginData.Userid),
-		chromedp.SendKeys(`#txtPW`, loginData.Userpw),
+		chromedp.SetValue(`#txtID`, loginData.Userid, chromedp.ByID),
+		chromedp.SetValue(`#txtPW`, loginData.Userpw, chromedp.ByID),
+		chromedp.SendKeys(`#txtPW`, kb.Enter, chromedp.ByID),
 	})
 
 }
