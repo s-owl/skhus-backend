@@ -6,10 +6,11 @@ import (
 )
 
 func SetupUsersRoutes(router *gin.Engine) {
-	users := router.Group("/users"){
-		users.POST("/login", users.Login)
-		users.GET("/userinfo")
-		users.GET("/credits")
-		users.GET("/attendance")
+	r := router.Group("/users")
+	{
+		r.POST("/login", users.Login)
+		// r.GET("/userinfo")
+		// r.GET("/credits")
+		// r.GET("/attendance")
 	}
 }
