@@ -24,6 +24,7 @@ type LoginData struct {
 }
 
 func Login(c *gin.Context) {
+
 	var loginData LoginData
 	if err := c.ShouldBindJSON(&loginData); err != nil {
 		c.String(http.StatusBadRequest,
@@ -102,9 +103,7 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 			fmt.Println("Page URL", currentURL)
 			switch currentURL {
 			case loginPageURL:
-				if !triedLogin {
-					triedLogin = true
-				} else {
+				if triedLogin {
 					errorMsg :=
 						`Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
 						로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
@@ -143,6 +142,7 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 		chromedp.SetValue(`#txtPW`, loginData.Userpw, chromedp.ByID),
 		chromedp.SendKeys(`#txtPW`, kb.Enter, chromedp.ByID),
 	})
+	triedLogin = true
 }
 
 func loginOnSam(ctx context.Context, loginData *LoginData,
