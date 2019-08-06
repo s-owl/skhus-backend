@@ -1,4 +1,4 @@
-module github.com/sukso96100/skhus-backend
+module github.com/skhus/skhus-backend
 
 go 1.12
 

@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/sukso96100/skhus-backend/users"
+	"github.com/skhus/skhus-backend/users"
 )
 
 func SetupUsersRoutes(router *gin.Engine) {
