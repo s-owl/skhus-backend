@@ -11,6 +11,7 @@ import (
 
 	"github.com/sukso96100/skhus-backend/consts"
 
+	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
@@ -101,27 +102,27 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 	triedLogin := false
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
-		if _, ok := ev.(*page.EventFrameNavigated); ok {
-			targets, _ := chromedp.Targets(ctx)
-			currentURL := targets[0].URL
-			fmt.Println("Page URL", currentURL)
-			switch currentURL {
-			case loginPageURL:
-				if triedLogin {
+		go func() {
+			if _, ok := ev.(*page.EventFrameNavigated); ok {
+				targets, _ := chromedp.Targets(ctx)
+				currentURL := targets[0].URL
+				fmt.Println("Page URL", currentURL)
+				switch currentURL {
+				case loginPageURL:
+					if triedLogin {
+						errorMsg :=
+							`Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
+							로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+						loginError <- errorMsg
+						break
+					}
+				case agreementPageURL:
 					errorMsg :=
-						`Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
-						로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+						`Please complete the privacy policy agreement on forest.skhu.ac.kr
+						forest.skhu.ac.kr 에서 개인정보 제공 동의를 먼저 완료해 주세요.`
 					loginError <- errorMsg
 					break
-				}
-			case agreementPageURL:
-				errorMsg :=
-					`Please complete the privacy policy agreement on forest.skhu.ac.kr
-					forest.skhu.ac.kr 에서 개인정보 제공 동의를 먼저 완료해 주세요.`
-				loginError <- errorMsg
-				break
-			case mainPageURL:
-				go func() {
+				case mainPageURL:
 					fmt.Println("Logged in on forest")
 					chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 						cookies, err := network.GetAllCookies().Do(ctx)
@@ -139,17 +140,17 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 						credentialOld <- result
 						return nil
 					}))
-				}()
+				}
 			}
-		}
+		}()
 	})
 
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(loginPageURL),
-		chromedp.WaitReady(`#txtID`, chromedp.ByID),
-		chromedp.SetValue(`#txtID`, loginData.Userid, chromedp.ByID),
-		chromedp.SetValue(`#txtPW`, loginData.Userpw, chromedp.ByID),
-		chromedp.SendKeys(`#txtPW`, kb.Enter, chromedp.ByID),
+		chromedp.WaitReady(`txtID`, chromedp.ByID),
+		chromedp.SetValue(`txtID`, loginData.Userid, chromedp.ByID),
+		chromedp.SetValue(`txtPW`, loginData.Userpw, chromedp.ByID),
+		chromedp.SendKeys(`txtPW`, kb.Enter, chromedp.ByID),
 	})
 	triedLogin = true
 }
@@ -158,22 +159,22 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 	credentialNew chan string, credentialNewToken chan string,
 	loginError chan string) {
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
-		if _, ok := ev.(*page.EventFrameNavigated); ok {
-			targets, _ := chromedp.Targets(ctx)
-			currentURL := targets[0].URL
-			fmt.Println("Page URL", currentURL)
-			switch {
-			case strings.HasPrefix(currentURL, consts.SkhuCasURL):
-				chromedp.Run(ctx, chromedp.Tasks{
-					chromedp.WaitReady(`#login-username`, chromedp.ByID),
-					chromedp.SetValue(`#login-username`, loginData.Userid, chromedp.ByID),
-					chromedp.SetValue(`#login-password`, loginData.Userpw, chromedp.ByID),
-					chromedp.SendKeys(`#login-password`, kb.Enter, chromedp.ByID),
-					chromedp.WaitVisible(`body.ng-scope.modal-open`, chromedp.ByQuery),
-				})
+		go func() {
 
-			case strings.HasPrefix(currentURL, consts.SkhuSamURL):
-				go func() {
+			if _, ok := ev.(*page.EventFrameNavigated); ok {
+				targets, _ := chromedp.Targets(ctx)
+				currentURL := targets[0].URL
+				fmt.Println("Page URL", currentURL)
+				switch {
+				case strings.HasPrefix(currentURL, consts.SkhuCasURL):
+					fmt.Println("Logging in on Sam...")
+					chromedp.Run(ctx, chromedp.Tasks{
+						// chromedp.WaitReady(`login-username`, chromedp.ByID),
+						chromedp.SetValue(`login-username`, loginData.Userid, chromedp.ByID),
+						chromedp.SetValue(`login-password`, loginData.Userpw, chromedp.ByID),
+						chromedp.SendKeys(`login-password`, kb.Enter, chromedp.ByID),
+					})
+				case strings.HasPrefix(currentURL, consts.SkhuSamURL):
 					fmt.Println("Logged in on Sam")
 					var tmpToken string
 					chromedp.Run(ctx, chromedp.Tasks{
@@ -197,16 +198,19 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 						chromedp.EvaluateAsDevTools(`document.body.getAttribute("ncg-request-verification-token")`, &tmpToken),
 					})
 					credentialNewToken <- tmpToken
-				}()
+				}
+			} else if ev, ok := ev.(*dom.EventAttributeModified); ok {
+				if ev.Name == "class" && ev.Value == "ng-scope modal-open" {
+					errorMsg :=
+						`Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
+						로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+					loginError <- errorMsg
+				}
 			}
-		}
+		}()
 	})
 	// chromedp.Run(ctx, )
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.SkhuSamURL),
 	})
-	errorMsg :=
-		`Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
-		로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
-	loginError <- errorMsg
 }
