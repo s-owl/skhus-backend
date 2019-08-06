@@ -63,22 +63,26 @@ func Login(c *gin.Context) {
 	go loginOnForest(forestCtx, &loginData, credentialOldChan, loginErrorChan)
 	go loginOnSam(samCtx, &loginData, credentialNewChan, credentialNewTokenChan, loginErrorChan)
 
+CREDENTIALS:
 	for {
 		select {
 		case errorMsg := <-loginErrorChan:
 			c.String(http.StatusUnauthorized, errorMsg)
 			return
 		case credentialOld = <-credentialOldChan:
+			fmt.Println("CredentialOld Received")
 			if credentialNew != "" && credentialNewToken != "" {
-				break
+				break CREDENTIALS
 			}
 		case credentialNew = <-credentialNewChan:
+			fmt.Println("CredentialNew Received")
 			if credentialOld != "" && credentialNewToken != "" {
-				break
+				break CREDENTIALS
 			}
 		case credentialNewToken = <-credentialNewTokenChan:
+			fmt.Println("CredentialBewToken Received")
 			if credentialOld != "" && credentialNew != "" {
-				break
+				break CREDENTIALS
 			}
 		}
 	}
@@ -117,27 +121,32 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 				loginError <- errorMsg
 				break
 			case mainPageURL:
-				chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
-					cookies, err := network.GetAllCookies().Do(ctx)
-					if err != nil {
-						return err
-					}
+				go func() {
+					fmt.Println("Logged in on forest")
+					chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+						cookies, err := network.GetAllCookies().Do(ctx)
+						if err != nil {
+							return err
+						}
 
-					var buf bytes.Buffer
-					for _, cookie := range cookies {
-						buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
-					}
+						var buf bytes.Buffer
+						for _, cookie := range cookies {
+							buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
+						}
+						result := buf.String()
+						fmt.Println(result)
 
-					credentialOld <- buf.String()
-					return nil
-				}))
+						credentialOld <- result
+						return nil
+					}))
+				}()
 			}
 		}
 	})
 
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(loginPageURL),
-		chromedp.WaitReady(`#txtID`),
+		chromedp.WaitReady(`#txtID`, chromedp.ByID),
 		chromedp.SetValue(`#txtID`, loginData.Userid, chromedp.ByID),
 		chromedp.SetValue(`#txtPW`, loginData.Userpw, chromedp.ByID),
 		chromedp.SendKeys(`#txtPW`, kb.Enter, chromedp.ByID),
@@ -154,40 +163,50 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 			currentURL := targets[0].URL
 			fmt.Println("Page URL", currentURL)
 			switch {
-			case currentURL == consts.SkhuCasURL:
+			case strings.HasPrefix(currentURL, consts.SkhuCasURL):
 				chromedp.Run(ctx, chromedp.Tasks{
-					chromedp.WaitReady(`#login-username`),
+					chromedp.WaitReady(`#login-username`, chromedp.ByID),
 					chromedp.SetValue(`#login-username`, loginData.Userid, chromedp.ByID),
 					chromedp.SetValue(`#login-password`, loginData.Userpw, chromedp.ByID),
 					chromedp.SendKeys(`#login-password`, kb.Enter, chromedp.ByID),
 					chromedp.WaitVisible(`body.ng-scope.modal-open`, chromedp.ByQuery),
 				})
-				errorMsg :=
-					`Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
-					로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
-				loginError <- errorMsg
+
 			case strings.HasPrefix(currentURL, consts.SkhuSamURL):
-				var tmpToken string
-				chromedp.Run(ctx, chromedp.Tasks{
-					chromedp.ActionFunc(func(ctx context.Context) error {
-						cookies, err := network.GetAllCookies().Do(ctx)
-						if err != nil {
-							return err
-						}
+				go func() {
+					fmt.Println("Logged in on Sam")
+					var tmpToken string
+					chromedp.Run(ctx, chromedp.Tasks{
+						chromedp.ActionFunc(func(ctx context.Context) error {
+							cookies, err := network.GetAllCookies().Do(ctx)
+							if err != nil {
+								return err
+							}
 
-						var buf bytes.Buffer
-						for _, cookie := range cookies {
-							buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
-						}
+							var buf bytes.Buffer
+							for _, cookie := range cookies {
+								buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
+							}
 
-						credentialNew <- buf.String()
-						return nil
-					}),
-					chromedp.Evaluate(`document.body.getAttribute("ncg-request-verification-token")`, &tmpToken),
-				})
-				credentialNewToken <- tmpToken
+							result := buf.String()
+							fmt.Println(result)
+
+							credentialNew <- result
+							return nil
+						}),
+						chromedp.EvaluateAsDevTools(`document.body.getAttribute("ncg-request-verification-token")`, &tmpToken),
+					})
+					credentialNewToken <- tmpToken
+				}()
 			}
 		}
 	})
-	chromedp.Run(ctx, chromedp.Navigate(consts.SkhuSamURL))
+	// chromedp.Run(ctx, )
+	chromedp.Run(ctx, chromedp.Tasks{
+		chromedp.Navigate(consts.SkhuSamURL),
+	})
+	errorMsg :=
+		`Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
+		로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+	loginError <- errorMsg
 }
