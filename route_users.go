@@ -6,7 +6,7 @@ import (
 )
 
 func SetupUsersRoutes(router *gin.Engine) {
-	r := router.Group("/users")
+	r := router.Group("/user")
 	{
 		r.POST("/login", users.Login)
 		// r.GET("/userinfo")
