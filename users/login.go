@@ -81,7 +81,7 @@ CREDENTIALS:
 				break CREDENTIALS
 			}
 		case credentialNewToken = <-credentialNewTokenChan:
-			fmt.Println("CredentialBewToken Received")
+			fmt.Println("CredentialNewToken Received")
 			if credentialOld != "" && credentialNew != "" {
 				break CREDENTIALS
 			}
@@ -160,7 +160,6 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 	loginError chan string) {
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
-
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
 				targets, _ := chromedp.Targets(ctx)
 				currentURL := targets[0].URL
@@ -169,15 +168,17 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 				case strings.HasPrefix(currentURL, consts.SkhuCasURL):
 					fmt.Println("Logging in on Sam...")
 					chromedp.Run(ctx, chromedp.Tasks{
-						// chromedp.WaitReady(`login-username`, chromedp.ByID),
-						chromedp.SetValue(`login-username`, loginData.Userid, chromedp.ByID),
-						chromedp.SetValue(`login-password`, loginData.Userpw, chromedp.ByID),
+						chromedp.SendKeys(`#login-username`, loginData.Userid),
+						chromedp.SendKeys(`#login-password`, loginData.Userpw),
 						chromedp.SendKeys(`login-password`, kb.Enter, chromedp.ByID),
 					})
 				case strings.HasPrefix(currentURL, consts.SkhuSamURL):
 					fmt.Println("Logged in on Sam")
 					var tmpToken string
+					var tokenOK bool
 					chromedp.Run(ctx, chromedp.Tasks{
+						chromedp.AttributeValue(`body`, `ncg-request-verification-token`, &tmpToken, &tokenOK, chromedp.ByQuery),
+						// chromedp.EvaluateAsDevTools(`document.body.getAttribute("ncg-request-verification-token")`, &tmpToken),
 						chromedp.ActionFunc(func(ctx context.Context) error {
 							cookies, err := network.GetAllCookies().Do(ctx)
 							if err != nil {
@@ -193,11 +194,13 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 							fmt.Println(result)
 
 							credentialNew <- result
+							if tokenOK {
+								credentialNewToken <- tmpToken
+							}
+
 							return nil
 						}),
-						chromedp.EvaluateAsDevTools(`document.body.getAttribute("ncg-request-verification-token")`, &tmpToken),
 					})
-					credentialNewToken <- tmpToken
 				}
 			} else if ev, ok := ev.(*dom.EventAttributeModified); ok {
 				if ev.Name == "class" && ev.Value == "ng-scope modal-open" {
