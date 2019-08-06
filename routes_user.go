@@ -5,7 +5,7 @@ import (
 	"github.com/skhus/skhus-backend/users"
 )
 
-func SetupUsersRoutes(router *gin.Engine) {
+func SetupUserRoutes(router *gin.Engine) {
 	r := router.Group("/user")
 	{
 		r.POST("/login", users.Login)
