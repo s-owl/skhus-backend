@@ -1,4 +1,4 @@
-package users
+package user
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/skhus/skhus-backend/consts"
+	"github.com/s-owl/skhus-backend/consts"
 
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/network"
