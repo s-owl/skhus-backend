@@ -59,8 +59,6 @@ func Login(c *gin.Context) {
 
 	var credentialOld, credentialNew, credentialNewToken string
 
-	// chromedp.Run(forestCtx, loginOnForest(loginData.Userid, loginData.Userpw, credentialOld, loginError))
-	// chromedp.Run(samCtx, loginOnSam(loginData.Userid, loginData.Userpw, credentialNew, credentialNewToken, loginError))
 	go loginOnForest(forestCtx, &loginData, credentialOldChan, loginErrorChan)
 	go loginOnSam(samCtx, &loginData, credentialNewChan, credentialNewTokenChan, loginErrorChan)
 
@@ -92,6 +90,8 @@ CREDENTIALS:
 		"credential-new":       credentialNew,
 		"credential-new-token": credentialNewToken,
 	})
+	cancel()
+	return
 }
 
 func loginOnForest(ctx context.Context, loginData *LoginData,
@@ -100,6 +100,7 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 	agreementPageURL := fmt.Sprintf("%s/Gate/CORE/P/CORP02P.aspx", consts.ForestURL)
 	mainPageURL := fmt.Sprintf("%s/Gate/UniMyMain.aspx", consts.ForestURL)
 	triedLogin := false
+	isCredentialSent := false
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
@@ -124,22 +125,26 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 					break
 				case mainPageURL:
 					fmt.Println("Logged in on forest")
-					chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
-						cookies, err := network.GetAllCookies().Do(ctx)
-						if err != nil {
-							return err
-						}
+					if !isCredentialSent {
 
-						var buf bytes.Buffer
-						for _, cookie := range cookies {
-							buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
-						}
-						result := buf.String()
-						fmt.Println(result)
+						chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+							cookies, err := network.GetAllCookies().Do(ctx)
+							if err != nil {
+								return err
+							}
 
-						credentialOld <- result
-						return nil
-					}))
+							var buf bytes.Buffer
+							for _, cookie := range cookies {
+								buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
+							}
+							result := buf.String()
+							fmt.Println(result)
+
+							credentialOld <- result
+							isCredentialSent = true
+							return nil
+						}))
+					}
 				}
 			}
 		}()
@@ -158,6 +163,7 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 func loginOnSam(ctx context.Context, loginData *LoginData,
 	credentialNew chan string, credentialNewToken chan string,
 	loginError chan string) {
+	isCredentialSent := false
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
@@ -174,33 +180,34 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 					})
 				case strings.HasPrefix(currentURL, consts.SkhuSamURL):
 					fmt.Println("Logged in on Sam")
-					var tmpToken string
-					var tokenOK bool
-					chromedp.Run(ctx, chromedp.Tasks{
-						chromedp.AttributeValue(`body`, `ncg-request-verification-token`, &tmpToken, &tokenOK, chromedp.ByQuery),
-						// chromedp.EvaluateAsDevTools(`document.body.getAttribute("ncg-request-verification-token")`, &tmpToken),
-						chromedp.ActionFunc(func(ctx context.Context) error {
-							cookies, err := network.GetAllCookies().Do(ctx)
-							if err != nil {
-								return err
-							}
+					if !isCredentialSent {
+						var tmpToken string
+						var tokenOK bool
+						chromedp.Run(ctx, chromedp.Tasks{
+							chromedp.AttributeValue(`body`, `ncg-request-verification-token`, &tmpToken, &tokenOK, chromedp.ByQuery),
+							chromedp.ActionFunc(func(ctx context.Context) error {
+								cookies, err := network.GetAllCookies().Do(ctx)
+								if err != nil {
+									return err
+								}
 
-							var buf bytes.Buffer
-							for _, cookie := range cookies {
-								buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
-							}
+								var buf bytes.Buffer
+								for _, cookie := range cookies {
+									buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
+								}
 
-							result := buf.String()
-							fmt.Println(result)
+								result := buf.String()
+								fmt.Println(result)
 
-							credentialNew <- result
-							if tokenOK {
-								credentialNewToken <- tmpToken
-							}
-
-							return nil
-						}),
-					})
+								credentialNew <- result
+								if tokenOK {
+									credentialNewToken <- tmpToken
+								}
+								isCredentialSent = true
+								return nil
+							}),
+						})
+					}
 				}
 			} else if ev, ok := ev.(*dom.EventAttributeModified); ok {
 				if ev.Name == "class" && ev.Value == "ng-scope modal-open" {
@@ -212,7 +219,6 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 			}
 		}()
 	})
-	// chromedp.Run(ctx, )
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.SkhuSamURL),
 	})
