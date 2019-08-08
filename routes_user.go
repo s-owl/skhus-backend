@@ -10,7 +10,7 @@ func SetupUserRoutes(router *gin.Engine) {
 	{
 		r.POST("/login", user.Login)
 		r.GET("/userinfo", user.GetUserinfo)
-		// r.GET("/credits")
+		r.GET("/credits", user.GetMyCredits)
 		// r.GET("/attendance")
 	}
 }
