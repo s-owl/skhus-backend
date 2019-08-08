@@ -47,10 +47,12 @@ func Login(c *gin.Context) {
 		chromedp.UserAgent(consts.UserAgentIE))
 
 	// Create contexts
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	forestCtx, _ := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
-	samCtx, _ := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
-	defer cancel()
+	allocCtx, cancelCtx := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancelCtx()
+	forestCtx, cancelForestCtx := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	defer cancelForestCtx()
+	samCtx, cancelSamCtx := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	defer cancelSamCtx()
 
 	credentialOldChan := make(chan string)
 	credentialNewChan := make(chan string)
@@ -90,7 +92,6 @@ CREDENTIALS:
 		"credential-new":       credentialNew,
 		"credential-new-token": credentialNewToken,
 	})
-	cancel()
 	return
 }
 
