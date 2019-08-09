@@ -7,14 +7,18 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/gin-gonic/gin"
 	"github.com/s-owl/skhus-backend/consts"
 	"github.com/s-owl/skhus-backend/tools"
 )
+
+var targetURL = fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
 
 func GetCurrentAttendance(c *gin.Context) {
 	credential := c.GetHeader("CredentialOld")
@@ -25,7 +29,6 @@ func GetCurrentAttendance(c *gin.Context) {
 			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
 		return
 	}
-	targetURL := fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", targetURL, nil)
@@ -60,35 +63,89 @@ func GetAttendanceWithOptions(c *gin.Context) {
 		return
 	}
 
-	targetURL := fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
 	// Options for custom user agent
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.UserAgent(consts.UserAgentIE))
 
 	// Create contexts
-	ctx, cancelCtx := chromedp.NewExecAllocator(context.Background(), opts...)
+	allocCtx, cancelAllocCtx := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancelAllocCtx()
+	ctx, cancelCtx := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
 	defer cancelCtx()
 
-	var content string
-
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		go func() {
+			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
+				targets, _ := chromedp.Targets(ctx)
+				if len(targets) > 0 {
+					currentURL := targets[0].URL
+					fmt.Println("Page URL", currentURL)
+					if currentURL == targetURL {
+						var content string
+						chromedp.Run(ctx, chromedp.Tasks{
+							chromedp.Sleep(1 * time.Second),
+							chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
+							chromedp.ActionFunc(func(context context.Context) error {
+								fmt.Println("Navigated to the target!")
+								fmt.Println(content)
+								return nil
+							}),
+							chromedp.WaitVisible(`txtYy`, chromedp.ByID),
+							chromedp.SendKeys(`#txtYy`, optionData.Year, chromedp.ByQuery),
+							chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
+							chromedp.Click(`#btnList`, chromedp.ByQuery),
+							chromedp.Sleep(1 * time.Second),
+							// chromedp.WaitReady(`ddlHaggi`, chromedp.ByID),
+							chromedp.InnerHTML(`#upContents`, &content, chromedp.ByQuery),
+						})
+						fmt.Println(content)
+						c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+						return
+					}
+				}
+			}
+		}()
+	})
+	// var content string
 	chromedp.Run(ctx, chromedp.Tasks{
+		chromedp.Navigate(consts.ForestURL),
 		chromedp.ActionFunc(func(context context.Context) error {
-			fmt.Println("Setting cookies")
+			// Block CoreSecurity.js
+			network.SetBlockedURLS(
+				[]string{
+					consts.CoreSecurityHttpURL,
+					// consts.CoreSecurityHttpsURL,
+				}).Do(context)
+
+			// Set Cokies
 			for _, item := range cookies {
-				network.SetCookie(item.Name, item.Value)
+				cookieParam := network.SetCookie(item.Name, item.Value)
+				cookieParam.URL = targetURL
+				ok, err := cookieParam.Do(context)
+				if ok {
+					fmt.Println("Cookie Set")
+				} else if err != nil {
+					fmt.Println(err)
+				}
 			}
 			return nil
 		}),
 		chromedp.Navigate(targetURL),
-		chromedp.WaitReady(`txtYy`, chromedp.ByID),
-		chromedp.SetValue(`txtYy`, optionData.Year, chromedp.ByID),
-		chromedp.SetValue(`ddlHaggi`, optionData.Semester, chromedp.ByID),
-		chromedp.Click(`btnList`, chromedp.ByID),
-		chromedp.WaitReady(`txtYy`, chromedp.ByID),
-		chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
+		// TODO: 페이지 로드 안되는 문제 수정
+		// chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
+		// chromedp.ActionFunc(func(context context.Context) error {
+		// 	fmt.Println("Navigated to the target")
+		// 	fmt.Println(content)
+		// 	return nil
+		// }),
+		// chromedp.SendKeys(`#txtYy`, optionData.Year, chromedp.ByQuery),
+		// chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
+		// chromedp.Click(`#btnList`, chromedp.ByQuery),
+		// chromedp.InnerHTML(`#upContents`, &content, chromedp.ByQuery),
 	})
-
-	c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+	// fmt.Println(content)
+	// c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+	// return
 }
 
 func extractData(body io.Reader) map[string]interface{} {
