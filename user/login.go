@@ -105,7 +105,7 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
-			if _, ok := ev.(*page.EventFrameNavigated); ok {
+			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
 				currentURL := targets[0].URL
 				fmt.Println("Page URL", currentURL)
