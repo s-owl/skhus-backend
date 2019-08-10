@@ -19,7 +19,7 @@ func SetupRoutes(router *gin.Engine) {
 	enrollRoutes := router.Group("/enroll")
 	{
 		enrollRoutes.GET("/saved_credits", enroll.GetSavedCredits)
-		// enrollRoutes.GET("/subjects")
-		// enrollRoutes.POST("/subjects")
+		enrollRoutes.GET("/subjects", enroll.GetSubjects)
+		enrollRoutes.POST("/subjects", enroll.GetSubjectsWithOptions)
 	}
 }
