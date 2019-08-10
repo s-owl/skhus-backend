@@ -43,7 +43,7 @@ type SubjectOption struct {
 	Year      string `form:"year" json:"year" xml:"year"  binding:"required"`
 	Semester  string `form:"semester" json:"semester" xml:"semester"  binding:"required"`
 	Major     string `form:"major" json:"major" xml:"major"  binding:"required"`
-	Professor string `form:"professor" json:"year" xml:"year"  binding:"required"`
+	Professor string `form:"professor" json:"professor" xml:"professor"  binding:"required"`
 }
 
 func GetSubjectsWithOptions(c *gin.Context) {
