@@ -65,12 +65,14 @@ func GetAttendanceWithOptions(c *gin.Context) {
 
 	// Options for custom user agent
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.UserAgent(consts.UserAgentIE))
+		chromedp.UserAgent(consts.UserAgentIE),
+		// chromedp.Flag("headless", false)
+	)
 
 	// Create contexts
 	allocCtx, cancelAllocCtx := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancelAllocCtx()
-	ctx, cancelCtx := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
 	defer cancelCtx()
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
@@ -80,42 +82,15 @@ func GetAttendanceWithOptions(c *gin.Context) {
 				if len(targets) > 0 {
 					currentURL := targets[0].URL
 					fmt.Println("Page URL", currentURL)
-					if currentURL == targetURL {
-						var content string
-						chromedp.Run(ctx, chromedp.Tasks{
-							chromedp.Sleep(1 * time.Second),
-							chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
-							chromedp.ActionFunc(func(context context.Context) error {
-								fmt.Println("Navigated to the target!")
-								fmt.Println(content)
-								return nil
-							}),
-							chromedp.WaitVisible(`txtYy`, chromedp.ByID),
-							chromedp.SendKeys(`#txtYy`, optionData.Year, chromedp.ByQuery),
-							chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
-							chromedp.Click(`#btnList`, chromedp.ByQuery),
-							chromedp.Sleep(1 * time.Second),
-							// chromedp.WaitReady(`ddlHaggi`, chromedp.ByID),
-							chromedp.InnerHTML(`#upContents`, &content, chromedp.ByQuery),
-						})
-						fmt.Println(content)
-						c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
-						return
-					}
 				}
 			}
 		}()
 	})
-	// var content string
+	var content string
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.ForestURL),
 		chromedp.ActionFunc(func(context context.Context) error {
-			// Block CoreSecurity.js
-			network.SetBlockedURLS(
-				[]string{
-					consts.CoreSecurityHttpURL,
-					// consts.CoreSecurityHttpsURL,
-				}).Do(context)
+			network.Enable().Do(context)
 
 			// Set Cokies
 			for _, item := range cookies {
@@ -128,24 +103,25 @@ func GetAttendanceWithOptions(c *gin.Context) {
 					fmt.Println(err)
 				}
 			}
+
+			// Block CoreSecurity.js
+			network.SetBlockedURLS(
+				[]string{
+					consts.CoreSecurity,
+				}).Do(context)
 			return nil
 		}),
 		chromedp.Navigate(targetURL),
-		// TODO: 페이지 로드 안되는 문제 수정
-		// chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
-		// chromedp.ActionFunc(func(context context.Context) error {
-		// 	fmt.Println("Navigated to the target")
-		// 	fmt.Println(content)
-		// 	return nil
-		// }),
-		// chromedp.SendKeys(`#txtYy`, optionData.Year, chromedp.ByQuery),
-		// chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
-		// chromedp.Click(`#btnList`, chromedp.ByQuery),
-		// chromedp.InnerHTML(`#upContents`, &content, chromedp.ByQuery),
+		chromedp.WaitVisible(`txtYy`, chromedp.ByID),
+		chromedp.SetValue(`#txtYy`, optionData.Year, chromedp.ByQuery),
+		chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
+		chromedp.Click(`#btnList`, chromedp.ByQuery),
+		chromedp.Sleep(300 * time.Millisecond),
+		chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
 	})
-	// fmt.Println(content)
-	// c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
-	// return
+	fmt.Println(content)
+	c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+	return
 }
 
 func extractData(body io.Reader) map[string]interface{} {
@@ -155,19 +131,21 @@ func extractData(body io.Reader) map[string]interface{} {
 	}
 	attendanceData := []gin.H{}
 	doc.Find("#gvList > tbody > tr").Each(func(i int, item *goquery.Selection) {
-		subjectStr := strings.TrimSpace(item.Children().Eq(0).Text())
-		splitedSubjArr := strings.Split(subjectStr, "(")
-		attendanceData = append(attendanceData, gin.H{
-			"subject_code": strings.Trim(splitedSubjArr[1], ")"),
-			"subject":      splitedSubjArr[0],
-			"time":         strings.TrimSpace(item.Children().Eq(1).Text()),
-			"attend":       strings.TrimSpace(item.Children().Eq(2).Text()),
-			"late":         strings.TrimSpace(item.Children().Eq(3).Text()),
-			"absence":      strings.TrimSpace(item.Children().Eq(4).Text()),
-			"approved":     strings.TrimSpace(item.Children().Eq(5).Text()),
-			"menstrual":    strings.TrimSpace(item.Children().Eq(6).Text()),
-			"early":        strings.TrimSpace(item.Children().Eq(7).Text()),
-		})
+		if i > 0 {
+			subjectStr := strings.TrimSpace(item.Children().Eq(0).Text())
+			splitedSubjArr := strings.Split(subjectStr, "(")
+			attendanceData = append(attendanceData, gin.H{
+				"subject_code": strings.Trim(splitedSubjArr[1], ")"),
+				"subject":      strings.TrimSpace(splitedSubjArr[0]),
+				"time":         strings.TrimSpace(item.Children().Eq(1).Text()),
+				"attend":       strings.TrimSpace(item.Children().Eq(2).Text()),
+				"late":         strings.TrimSpace(item.Children().Eq(3).Text()),
+				"absence":      strings.TrimSpace(item.Children().Eq(4).Text()),
+				"approved":     strings.TrimSpace(item.Children().Eq(5).Text()),
+				"menstrual":    strings.TrimSpace(item.Children().Eq(6).Text()),
+				"early":        strings.TrimSpace(item.Children().Eq(7).Text()),
+			})
+		}
 	})
 
 	return gin.H{
