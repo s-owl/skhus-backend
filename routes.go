@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/s-owl/skhus-backend/enroll"
 	"github.com/s-owl/skhus-backend/user"
+	"github.com/s-owl/skhus-backend/scholarship"
 )
 
 func SetupRoutes(router *gin.Engine) {
@@ -21,5 +22,10 @@ func SetupRoutes(router *gin.Engine) {
 		enrollRoutes.GET("/saved_credits", enroll.GetSavedCredits)
 		enrollRoutes.GET("/subjects", enroll.GetSubjects)
 		enrollRoutes.POST("/subjects", enroll.GetSubjectsWithOptions)
+	}
+
+	scholarshipRoutes := router.Group("scholarship")
+	{
+		scholarshipRoutes.GET("history", scholarship.GetScholarshipHistory)
 	}
 }
