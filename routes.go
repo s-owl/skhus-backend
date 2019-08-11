@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/s-owl/skhus-backend/enroll"
-	"github.com/s-owl/skhus-backend/user"
 	"github.com/s-owl/skhus-backend/scholarship"
+	"github.com/s-owl/skhus-backend/user"
 )
 
 func SetupRoutes(router *gin.Engine) {
@@ -27,5 +27,6 @@ func SetupRoutes(router *gin.Engine) {
 	scholarshipRoutes := router.Group("scholarship")
 	{
 		scholarshipRoutes.GET("history", scholarship.GetScholarshipHistory)
+		scholarshipRoutes.GET("result", scholarship.GetScholarshipResults)
 	}
 }
