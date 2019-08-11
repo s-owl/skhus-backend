@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/s-owl/skhus-backend/enroll"
 	"github.com/s-owl/skhus-backend/grade"
+	"github.com/s-owl/skhus-backend/life"
 	"github.com/s-owl/skhus-backend/scholarship"
 	"github.com/s-owl/skhus-backend/user"
 )
@@ -34,5 +35,10 @@ func SetupRoutes(router *gin.Engine) {
 	gradeRoutes := router.Group("grade")
 	{
 		gradeRoutes.GET("certificate", grade.GetGradeCertificate)
+	}
+
+	lifeRoutes := router.Group("life")
+	{
+		lifeRoutes.POST("schedules", life.GetSchedulesWithOptions)
 	}
 }

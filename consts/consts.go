@@ -4,6 +4,7 @@ const ForestURL string = "http://forest.skhu.ac.kr"
 const ForestDomain string = "forest.skhu.ac.kr"
 const SkhuSamURL string = "http://sam.skhu.ac.kr"
 const SkhuCasURL string = "http://cas.skhu.ac.kr"
+const SkhuURL string = "http://skhu.ac.kr"
 
 const CoreSecurity string = "*/CoreSecurity.js"
 
