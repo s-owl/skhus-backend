@@ -1,8 +1,19 @@
-FROM golang:1.12 AS build
-RUN go install
-RUn go build -o backend .
+# build stage
+FROM golang:1.12-stretch AS build
 
-FROM chromedp/headless-shell:78.0.3876.0 AS runtime
-COPY --from=build backend /bin/backend
+RUN mkdir /build
+COPY ./ /build
+WORKDIR /build
+RUN go build -o skhus-backend .
 
-CMD ["backend"]
+# product stage
+FROM chromedp/headless-shell:latest
+
+RUN mkdir /app
+WORKDIR /app
+COPY --from=build /build/skhus-backend .
+
+ENV PATH=$PATH:/headless-shell
+
+EXPOSE 8080
+ENTRYPOINT ["./skhus-backend"]
