@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
+	"github.com/s-owl/skhus-backend/consts"
 	"golang.org/x/text/encoding/korean"
 	"golang.org/x/text/transform"
 )
@@ -30,4 +32,28 @@ func EucKrReaderToUtf8Reader(body io.Reader) io.Reader {
 	decBytes, _ := ioutil.ReadAll(rInUTF8)
 	decrypted := string(decBytes)
 	return strings.NewReader(decrypted)
+}
+
+func CredentialOldCheckMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		credential := c.GetHeader("CredentialOld")
+		if credential == "" {
+			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
+		}
+		for _, item := range []string{"ASP.NET_SessionId", ".AuthCookie", "UniCookie", "KIS"} {
+			if !strings.Contains(credential, item) {
+				c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
+			}
+		}
+		if len(strings.Split(credential, ";")) != 4 {
+			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
+		}
+		cookies, err := ConvertToCookies(credential)
+		if err != nil {
+			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
+		}
+		c.Set("CredentialOldCookies", cookies)
+		c.Set("CredentialOld", credential)
+		c.Next()
+	}
 }

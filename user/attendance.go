@@ -21,19 +21,13 @@ import (
 var targetURL = fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
 
 func GetCurrentAttendance(c *gin.Context) {
-	credential := c.GetHeader("CredentialOld")
-	_, err := tools.ConvertToCookies(credential)
-	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
-		return
-	}
-
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", credential)
+	req, _ := http.NewRequest("GET", targetURL, nil)
+	req.Header.Add("Cookie", c.MustGet("example").(string))
 	res, err := client.Do(req)
+	if err != nil {
+		c.String(http.StatusInternalServerError, consts.InternalError)
+	}
 	defer res.Body.Close()
 
 	c.JSON(http.StatusOK, extractData(tools.EucKrReaderToUtf8Reader(res.Body)))
@@ -45,16 +39,7 @@ type AttendanceOption struct {
 }
 
 func GetAttendanceWithOptions(c *gin.Context) {
-
-	credential := c.GetHeader("CredentialOld")
-	cookies, err := tools.ConvertToCookies(credential)
-	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
-		return
-	}
-
+	cookies := c.MustGet("CredentialOldCookies").([]*http.Cookie)
 	var optionData AttendanceOption
 	if err := c.ShouldBindJSON(&optionData); err != nil {
 		c.String(http.StatusBadRequest,

@@ -13,19 +13,13 @@ import (
 
 func GetScholarshipResults(c *gin.Context) {
 	targetURL := fmt.Sprintf("%s/GATE/SAM/SCHOLARSHIP/S/SJHS06S.ASPX?&maincd=O&systemcd=S&seq=1", consts.ForestURL)
-	credential := c.GetHeader("CredentialOld")
-	_, err := tools.ConvertToCookies(credential)
-	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
-		return
-	}
-
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", credential)
+	req, _ := http.NewRequest("GET", targetURL, nil)
+	req.Header.Add("Cookie", c.MustGet("example").(string))
 	res, err := client.Do(req)
+	if err != nil {
+		c.String(http.StatusInternalServerError, consts.InternalError)
+	}
 	defer res.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(tools.EucKrReaderToUtf8Reader(res.Body))
