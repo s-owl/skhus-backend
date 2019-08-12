@@ -21,19 +21,14 @@ import (
 var targetURL = fmt.Sprintf("%s/GATE/SAM/LECTURE/S/SSGS09S.ASPX?&maincd=O&systemcd=S&seq=1", consts.ForestURL)
 
 func GetSubjects(c *gin.Context) {
-	credential := c.GetHeader("CredentialOld")
-	_, err := tools.ConvertToCookies(credential)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", targetURL, nil)
+	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
+	res, err := client.Do(req)
 	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
+		c.String(http.StatusInternalServerError, consts.InternalError)
 		return
 	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", credential)
-	res, err := client.Do(req)
 	defer res.Body.Close()
 
 	c.JSON(http.StatusOK, extractData(tools.EucKrReaderToUtf8Reader(res.Body)))
@@ -47,15 +42,7 @@ type SubjectOption struct {
 }
 
 func GetSubjectsWithOptions(c *gin.Context) {
-	credential := c.GetHeader("CredentialOld")
-	cookies, err := tools.ConvertToCookies(credential)
-	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
-		return
-	}
-
+	cookies := c.MustGet("CredentialOldCookies").([]*http.Cookie)
 	var optionData SubjectOption
 	if err := c.ShouldBindJSON(&optionData); err != nil {
 		c.String(http.StatusBadRequest,

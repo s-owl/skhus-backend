@@ -10,3 +10,6 @@ const CoreSecurity string = "*/CoreSecurity.js"
 
 const UserAgentIE string = "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)"
 const UserAgentMacOsChrome string = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36"
+
+const CredentialMalformedMsg string = "Empty or malformed credential data.\n비어 있거나 올바르지 않은 인증 데이터 입니다."
+const InternalError string = "An internal error occured while processing data\n데이터 처리중 내부적 오류가 발생했습니다."

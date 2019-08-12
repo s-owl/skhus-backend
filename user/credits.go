@@ -13,20 +13,16 @@ import (
 )
 
 func GetMyCredits(c *gin.Context) {
-	credential := c.GetHeader("CredentialOld")
-	_, err := tools.ConvertToCookies(credential)
-	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
-		return
-	}
 	targetURL := fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", credential)
+	req, _ := http.NewRequest("GET", targetURL, nil)
+	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
 	res, err := client.Do(req)
+	if err != nil {
+		c.String(http.StatusInternalServerError, consts.InternalError)
+		return
+	}
 	defer res.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(tools.EucKrReaderToUtf8Reader(res.Body))

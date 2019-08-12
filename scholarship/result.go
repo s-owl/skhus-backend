@@ -13,19 +13,14 @@ import (
 
 func GetScholarshipResults(c *gin.Context) {
 	targetURL := fmt.Sprintf("%s/GATE/SAM/SCHOLARSHIP/S/SJHS06S.ASPX?&maincd=O&systemcd=S&seq=1", consts.ForestURL)
-	credential := c.GetHeader("CredentialOld")
-	_, err := tools.ConvertToCookies(credential)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", targetURL, nil)
+	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
+	res, err := client.Do(req)
 	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
+		c.String(http.StatusInternalServerError, consts.InternalError)
 		return
 	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", credential)
-	res, err := client.Do(req)
 	defer res.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(tools.EucKrReaderToUtf8Reader(res.Body))
@@ -38,6 +33,7 @@ func GetScholarshipResults(c *gin.Context) {
 		c.String(http.StatusNoContent,
 			`It's not the period for checking scholarship results yet.
 		장학금 신청 결과 조회 기간이 아닙니다.`)
+		return
 	}
 
 	results := []gin.H{}
