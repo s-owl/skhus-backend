@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/s-owl/skhus-backend/consts"
@@ -36,26 +37,30 @@ func EucKrReaderToUtf8Reader(body io.Reader) io.Reader {
 
 func CredentialOldCheckMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		credential := c.GetHeader("CredentialOld")
+		credential := c.GetHeader("Credential")
 		if credential == "" {
+			fmt.Println("empty credential")
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 			c.Abort()
 			return
 		}
 		for _, item := range []string{"ASP.NET_SessionId", ".AuthCookie", "UniCookie", "KIS"} {
 			if !strings.Contains(credential, item) {
+				fmt.Println("not full cookie")
 				c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 				c.Abort()
 				return
 			}
 		}
 		if len(strings.Split(credential, ";")) != 5 {
+			fmt.Println("cookie number wrong")
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 			c.Abort()
 			return
 		}
 		cookies, err := ConvertToCookies(credential)
 		if err != nil {
+			fmt.Println("Wrong Cookie")
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 			c.Abort()
 			return
