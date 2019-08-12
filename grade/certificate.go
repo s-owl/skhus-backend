@@ -16,7 +16,7 @@ func GetGradeCertificate(c *gin.Context) {
 	targetURL := fmt.Sprintf("%s/GATE/SAM/SCORE/S/SSJS06S.ASPX?&maincd=O&systemcd=S&seq=1", consts.ForestURL)
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", c.MustGet("example").(string))
+	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)

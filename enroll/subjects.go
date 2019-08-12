@@ -23,7 +23,7 @@ var targetURL = fmt.Sprintf("%s/GATE/SAM/LECTURE/S/SSGS09S.ASPX?&maincd=O&system
 func GetSubjects(c *gin.Context) {
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", c.MustGet("example").(string))
+	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)
