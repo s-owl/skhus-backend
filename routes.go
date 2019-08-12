@@ -40,5 +40,9 @@ func SetupRoutes(router *gin.Engine) {
 	lifeRoutes := router.Group("life")
 	{
 		lifeRoutes.POST("schedules", life.GetSchedulesWithOptions)
+		mealGroup := lifeRoutes.Group("meal"){
+			mealGroup.GET("urls", life.GetMealURLs)
+			mealGroup.POST("data", life.GetMealData)
+		}
 	}
 }
