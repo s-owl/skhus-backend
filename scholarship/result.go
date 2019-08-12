@@ -19,6 +19,7 @@ func GetScholarshipResults(c *gin.Context) {
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)
+		return
 	}
 	defer res.Body.Close()
 
@@ -32,6 +33,7 @@ func GetScholarshipResults(c *gin.Context) {
 		c.String(http.StatusNoContent,
 			`It's not the period for checking scholarship results yet.
 		장학금 신청 결과 조회 기간이 아닙니다.`)
+		return
 	}
 
 	results := []gin.H{}

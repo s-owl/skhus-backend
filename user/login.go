@@ -40,6 +40,7 @@ func Login(c *gin.Context) {
 			If your using password with less then 8 digits, please change it at forest.skhu.ac.kr
 			학번 또는 비밀번호가 비어있거나 비밀번호가 8자리 미만 입니다.
 			8자리 미만 비밀번호 사용 시, forest.skhu.ac.kr 에서 변경 후 사용해 주세요.`)
+		return
 	}
 
 	// Options for custom user agent

@@ -27,6 +27,7 @@ func GetCurrentAttendance(c *gin.Context) {
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)
+		return
 	}
 	defer res.Body.Close()
 
