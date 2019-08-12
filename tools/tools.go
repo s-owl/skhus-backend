@@ -39,18 +39,22 @@ func CredentialOldCheckMiddleware() gin.HandlerFunc {
 		credential := c.GetHeader("CredentialOld")
 		if credential == "" {
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
+			return
 		}
 		for _, item := range []string{"ASP.NET_SessionId", ".AuthCookie", "UniCookie", "KIS"} {
 			if !strings.Contains(credential, item) {
 				c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
+				return
 			}
 		}
 		if len(strings.Split(credential, ";")) != 4 {
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
+			return
 		}
 		cookies, err := ConvertToCookies(credential)
 		if err != nil {
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
+			return
 		}
 		c.Set("CredentialOldCookies", cookies)
 		c.Set("CredentialOld", credential)
