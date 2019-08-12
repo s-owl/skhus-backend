@@ -2,11 +2,11 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/s-owl/skhus-backend/tools"
 	"github.com/s-owl/skhus-backend/enroll"
 	"github.com/s-owl/skhus-backend/grade"
 	"github.com/s-owl/skhus-backend/life"
 	"github.com/s-owl/skhus-backend/scholarship"
+	"github.com/s-owl/skhus-backend/tools"
 	"github.com/s-owl/skhus-backend/user"
 )
 
@@ -14,13 +14,13 @@ func SetupRoutes(router *gin.Engine) {
 	userRoutes := router.Group("/user")
 	{
 		userRoutes.POST("/login", user.Login)
-		userRoutes.GET("/userinfo", 
+		userRoutes.GET("/userinfo",
 			tools.CredentialOldCheckMiddleware(), user.GetUserinfo)
-		userRoutes.GET("/credits", 
+		userRoutes.GET("/credits",
 			tools.CredentialOldCheckMiddleware(), user.GetMyCredits)
-		userRoutes.GET("/attendance", 
+		userRoutes.GET("/attendance",
 			tools.CredentialOldCheckMiddleware(), user.GetCurrentAttendance)
-		userRoutes.POST("/attendance", 
+		userRoutes.POST("/attendance",
 			tools.CredentialOldCheckMiddleware(), user.GetAttendanceWithOptions)
 	}
 
@@ -48,7 +48,8 @@ func SetupRoutes(router *gin.Engine) {
 	lifeRoutes := router.Group("life")
 	{
 		lifeRoutes.POST("schedules", life.GetSchedulesWithOptions)
-		mealGroup := lifeRoutes.Group("meal"){
+		mealGroup := lifeRoutes.Group("meal")
+		{
 			mealGroup.GET("urls", life.GetMealURLs)
 			mealGroup.POST("data", life.GetMealData)
 		}
