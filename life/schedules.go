@@ -24,7 +24,7 @@ func GetSchedulesWithOptions(c *gin.Context) {
 			비어 있거나 올바르지 않은 조건 데이터 입니다.`)
 		return
 	}
-	targetURL := fmt.Sprintf("%s/calendar/calendar_list_1.aspx?strYear=%s&strMonth=%s",
+	targetURL := fmt.Sprintf("%s/calendar/calendar_list_1.aspx?strYear=%d&strMonth=%d",
 		consts.SkhuURL, optionData.Year, optionData.Month)
 
 	client := &http.Client{}
