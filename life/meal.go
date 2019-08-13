@@ -32,7 +32,10 @@ func GetMealURLs(c *gin.Context) {
 			"date":  item.Children().Eq(3).Text(),
 		})
 	})
-
+	c.JSON(http.StatusOK, gin.H{
+		"urls": mealUrls,
+	})
+	return
 }
 
 type MealOption struct {
@@ -64,26 +67,26 @@ func GetMealData(c *gin.Context) {
 	mealTable := doc.Find("table.cont_c")
 	for i := 0; i < 5; i++ {
 		meal = append(meal, gin.H{
-			"day":  mealTable.Find(fmt.Sprintf(`thead > tr:nth-child(1) > th:nth-child(%i)`, i+2)).Text(),
-			"date": mealTable.Find(fmt.Sprintf(`thead > tr:nth-child(2) > th:nth-child(%i)`, i+3)).Text(),
+			"day":  mealTable.Find(fmt.Sprintf(`thead > tr:nth-child(1) > th:nth-child(%d)`, i+2)).Text(),
+			"date": mealTable.Find(fmt.Sprintf(`thead > tr:nth-child(2) > th:nth-child(%d)`, i+3)).Text(),
 			"lunch": gin.H{
 				"a": gin.H{
-					"diet":    mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(1) > td:nth-child(%i)`, i+3)).Text(),
-					"calorie": mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(2) > td:nth-child(%i)`, i+3)).Text(),
+					"diet":    mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(1) > td:nth-child(%d)`, i+3)).Text(),
+					"calorie": mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(2) > td:nth-child(%d)`, i+3)).Text(),
 				},
 				"b": gin.H{
-					"diet":    mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(3) > td:nth-child(%i)`, i+2)).Text(),
-					"calorie": mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(4) > td:nth-child(%i)`, i+2)).Text(),
+					"diet":    mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(3) > td:nth-child(%d)`, i+2)).Text(),
+					"calorie": mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(4) > td:nth-child(%d)`, i+2)).Text(),
 				},
 				"c": gin.H{
-					"diet":    mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(5) > td:nth-child(%i)`, i+2)).Text(),
-					"calorie": mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(6) > td:nth-child(%i)`, i+2)).Text(),
+					"diet":    mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(5) > td:nth-child(%d)`, i+2)).Text(),
+					"calorie": mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(6) > td:nth-child(%d)`, i+2)).Text(),
 				},
 			},
 			"dinner": gin.H{
 				"a": gin.H{
-					"diet":    mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(7) > td:nth-child(%i)`, i+3)).Text(),
-					"calorie": mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(8) > td:nth-child(%i)`, i+3)).Text(),
+					"diet":    mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(7) > td:nth-child(%d)`, i+3)).Text(),
+					"calorie": mealTable.Find(fmt.Sprintf(`tbody > tr:nth-child(8) > td:nth-child(%d)`, i+3)).Text(),
 				},
 			},
 		})
