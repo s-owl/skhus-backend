@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/network"
@@ -18,7 +17,7 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
-var targetURL = fmt.Sprintf("%s/GATE/SAM/LECTURE/S/SSGS09S.ASPX?&maincd=O&systemcd=S&seq=1", consts.ForestURL)
+var targetURL = fmt.Sprintf("%s/GATE/SAM/LECTURE/S/SSGS09S.ASPX?maincd=O&systemcd=S&seq=1", consts.ForestURL)
 
 func GetSubjects(c *gin.Context) {
 	client := &http.Client{}
@@ -74,7 +73,6 @@ func GetSubjectsWithOptions(c *gin.Context) {
 			}
 		}()
 	})
-	var content string
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.ForestURL),
 		chromedp.ActionFunc(func(context context.Context) error {
@@ -105,13 +103,28 @@ func GetSubjectsWithOptions(c *gin.Context) {
 		chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
 		chromedp.SetValue(`#ddlSosog`, optionData.Major, chromedp.ByQuery),
 		chromedp.SetValue(`#txtPermNm`, optionData.Professor, chromedp.ByQuery),
-		chromedp.Click(`#CSMenuButton1_List`, chromedp.ByQuery),
-		chromedp.Sleep(300 * time.Millisecond),
-		chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
 	})
-	fmt.Println(content)
-	c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
-	return
+
+	dataLoaded := make(chan string)
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		go func(data chan string) {
+			if ev, ok := ev.(*network.EventResponseReceived); ok {
+				if ev.Response.URL == targetURL {
+					var content string
+					chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
+					data <- content
+				}
+			}
+		}(dataLoaded)
+	})
+
+	chromedp.Run(ctx, chromedp.Click(`#CSMenuButton1_List`, chromedp.ByQuery))
+	select {
+	case content := <-dataLoaded:
+		c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+		return
+	}
+
 }
 
 func extractData(body io.Reader) map[string]interface{} {
