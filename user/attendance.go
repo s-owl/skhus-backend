@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"strconv"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/network"
@@ -34,7 +36,7 @@ func GetCurrentAttendance(c *gin.Context) {
 }
 
 type AttendanceOption struct {
-	Year     string `form:"year" json:"year" xml:"year"  binding:"required"`
+	Year     string `form:"year" json:"year" xml:"year"`
 	Semester string `form:"semester" json:"semester" xml:"semester"  binding:"required"`
 }
 
@@ -46,6 +48,10 @@ func GetAttendanceWithOptions(c *gin.Context) {
 			`Empty or malformed option data.
 			비어 있거나 올바르지 않은 조건 데이터 입니다.`)
 		return
+	}
+
+	if optionData.Year == "" {
+		optionData.Year = strconv.Itoa(time.Now().Year())
 	}
 
 	// Options for custom user agent
