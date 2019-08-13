@@ -34,10 +34,10 @@ func GetSubjects(c *gin.Context) {
 }
 
 type SubjectOption struct {
-	Year      string `form:"year" json:"year" xml:"year"  binding:"required"`
-	Semester  string `form:"semester" json:"semester" xml:"semester"  binding:"required"`
-	Major     string `form:"major" json:"major" xml:"major"  binding:"required"`
-	Professor string `form:"professor" json:"professor" xml:"professor"  binding:"required"`
+	Year      string `form:"year" json:"year" xml:"year" binding:"required"`
+	Semester  string `form:"semester" json:"semester" xml:"semester" binding:"required"`
+	Major     string `form:"major" json:"major" xml:"major" binding:"required"`
+	Professor string `form:"professor" json:"professor" xml:"professor"`
 }
 
 func GetSubjectsWithOptions(c *gin.Context) {
@@ -53,7 +53,7 @@ func GetSubjectsWithOptions(c *gin.Context) {
 	// Options for custom user agent
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.UserAgent(consts.UserAgentIE),
-		// chromedp.Flag("headless", false)
+		// chromedp.Flag("headless", false),
 	)
 
 	// Create contexts
@@ -108,12 +108,10 @@ func GetSubjectsWithOptions(c *gin.Context) {
 	dataLoaded := make(chan string)
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func(data chan string) {
-			if ev, ok := ev.(*network.EventResponseReceived); ok {
-				if ev.Response.URL == targetURL {
-					var content string
-					chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
-					data <- content
-				}
+			if _, ok := ev.(*network.EventLoadingFinished); ok {
+				var content string
+				chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
+				data <- content
 			}
 		}(dataLoaded)
 	})
