@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"strconv"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -35,7 +36,7 @@ func GetCurrentAttendance(c *gin.Context) {
 }
 
 type AttendanceOption struct {
-	Year     string `form:"year" json:"year" xml:"year"  binding:"required"`
+	Year     string `form:"year" json:"year" xml:"year"`
 	Semester string `form:"semester" json:"semester" xml:"semester"  binding:"required"`
 }
 
@@ -47,6 +48,10 @@ func GetAttendanceWithOptions(c *gin.Context) {
 			`Empty or malformed option data.
 			비어 있거나 올바르지 않은 조건 데이터 입니다.`)
 		return
+	}
+
+	if optionData.Year == "" {
+		optionData.Year = strconv.Itoa(time.Now().Year())
 	}
 
 	// Options for custom user agent
@@ -72,7 +77,6 @@ func GetAttendanceWithOptions(c *gin.Context) {
 			}
 		}()
 	})
-	var content string
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.ForestURL),
 		chromedp.ActionFunc(func(context context.Context) error {
@@ -101,13 +105,32 @@ func GetAttendanceWithOptions(c *gin.Context) {
 		chromedp.WaitVisible(`txtYy`, chromedp.ByID),
 		chromedp.SetValue(`#txtYy`, optionData.Year, chromedp.ByQuery),
 		chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
-		chromedp.Click(`#btnList`, chromedp.ByQuery),
-		chromedp.Sleep(300 * time.Millisecond),
-		chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
 	})
-	fmt.Println(content)
-	c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
-	return
+
+	dataLoaded := make(chan string)
+
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		go func(data chan string) {
+			if ev, ok := ev.(*network.EventResponseReceived); ok {
+				fmt.Println(ev.Response.URL)
+				if ev.Response.URL == targetURL {
+					var content string
+					chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
+					data <- content
+				}
+			}
+		}(dataLoaded)
+	})
+
+	chromedp.Run(ctx, chromedp.Tasks{
+		chromedp.Click(`#btnList`, chromedp.ByQuery),
+	})
+
+	select {
+	case content := <-dataLoaded:
+		c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+		return
+	}
 }
 
 func extractData(body io.Reader) map[string]interface{} {
