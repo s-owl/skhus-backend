@@ -12,8 +12,8 @@ import (
 )
 
 type ScheduleOption struct {
-	Year  string `form:"year" json:"year" xml:"year"  binding:"required"`
-	Month string `form:"month" json:"month" xml:"month"  binding:"required"`
+	Year  int `form:"year" json:"year" xml:"year"  binding:"required"`
+	Month int `form:"month" json:"month" xml:"month"  binding:"required"`
 }
 
 func GetSchedulesWithOptions(c *gin.Context) {
