@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/network"
@@ -72,7 +71,6 @@ func GetAttendanceWithOptions(c *gin.Context) {
 			}
 		}()
 	})
-	var content string
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.ForestURL),
 		chromedp.ActionFunc(func(context context.Context) error {
@@ -101,13 +99,32 @@ func GetAttendanceWithOptions(c *gin.Context) {
 		chromedp.WaitVisible(`txtYy`, chromedp.ByID),
 		chromedp.SetValue(`#txtYy`, optionData.Year, chromedp.ByQuery),
 		chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
-		chromedp.Click(`#btnList`, chromedp.ByQuery),
-		chromedp.Sleep(300 * time.Millisecond),
-		chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
 	})
-	fmt.Println(content)
-	c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
-	return
+
+	dataLoaded := make(chan string)
+
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		go func(data chan string) {
+			if ev, ok := ev.(*network.EventResponseReceived); ok {
+				fmt.Println(ev.Response.URL)
+				if ev.Response.URL == targetURL {
+					var content string
+					chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
+					data <- content
+				}
+			}
+		}(dataLoaded)
+	})
+
+	chromedp.Run(ctx, chromedp.Tasks{
+		chromedp.Click(`#btnList`, chromedp.ByQuery),
+	})
+
+	select {
+	case content := <-dataLoaded:
+		c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+		return
+	}
 }
 
 func extractData(body io.Reader) map[string]interface{} {
