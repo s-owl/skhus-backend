@@ -132,7 +132,7 @@ func extractData(body io.Reader) map[string]interface{} {
 	}
 	list := []gin.H{}
 	doc.Find("#dgList > tbody > tr").Each(func(i int, item *goquery.Selection) {
-		if i > 0 && i < 13 {
+		if i >= 0 && i < 13 {
 			list = append(list, gin.H{
 				"type":        item.Children().Eq(0).Text(),
 				"grade":       item.Children().Eq(1).Text(),
