@@ -12,8 +12,8 @@ import (
 )
 
 type ScheduleOption struct {
-	Year  string `form:"year" json:"year" xml:"year"  binding:"required"`
-	Month string `form:"month" json:"month" xml:"month"  binding:"required"`
+	Year  int `form:"year" json:"year" xml:"year"  binding:"required"`
+	Month int `form:"month" json:"month" xml:"month"  binding:"required"`
 }
 
 func GetSchedulesWithOptions(c *gin.Context) {
@@ -24,7 +24,7 @@ func GetSchedulesWithOptions(c *gin.Context) {
 			비어 있거나 올바르지 않은 조건 데이터 입니다.`)
 		return
 	}
-	targetURL := fmt.Sprintf("%s/calendar/calendar_list_1.aspx?strYear=%s&strMonth=%s",
+	targetURL := fmt.Sprintf("%s/calendar/calendar_list_1.aspx?strYear=%d&strMonth=%d",
 		consts.SkhuURL, optionData.Year, optionData.Month)
 
 	client := &http.Client{}
@@ -39,10 +39,12 @@ func GetSchedulesWithOptions(c *gin.Context) {
 
 	schedules := []gin.H{}
 	doc.Find("div.info > table > tbody > tr").Each(func(i int, item *goquery.Selection) {
-		schedules = append(schedules, gin.H{
-			"period":  item.Children().Eq(0).Text(),
-			"content": item.Children().Eq(1).Text(),
-		})
+		if i > 0 {
+			schedules = append(schedules, gin.H{
+				"period":  item.Children().Eq(0).Text(),
+				"content": item.Children().Eq(1).Text(),
+			})
+		}
 	})
 
 	c.JSON(http.StatusOK, gin.H{
