@@ -14,19 +14,14 @@ import (
 
 func GetSavedCredits(c *gin.Context) {
 	targetURL := fmt.Sprintf("%s/Gate/SAM/Lecture/H/SSGH03S.aspx?&maincd=O&systemcd=S&seq=100", consts.ForestURL)
-	credential := c.GetHeader("CredentialOld")
-	_, err := tools.ConvertToCookies(credential)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", targetURL, nil)
+	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
+	res, err := client.Do(req)
 	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
+		c.String(http.StatusInternalServerError, consts.InternalError)
 		return
 	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", credential)
-	res, err := client.Do(req)
 	defer res.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(tools.EucKrReaderToUtf8Reader(res.Body))

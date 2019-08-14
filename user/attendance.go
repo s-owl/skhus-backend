@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"strconv"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -21,46 +22,36 @@ import (
 var targetURL = fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
 
 func GetCurrentAttendance(c *gin.Context) {
-	credential := c.GetHeader("CredentialOld")
-	_, err := tools.ConvertToCookies(credential)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", targetURL, nil)
+	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
+	res, err := client.Do(req)
 	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
+		c.String(http.StatusInternalServerError, consts.InternalError)
 		return
 	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", credential)
-	res, err := client.Do(req)
 	defer res.Body.Close()
 
 	c.JSON(http.StatusOK, extractData(tools.EucKrReaderToUtf8Reader(res.Body)))
 }
 
 type AttendanceOption struct {
-	Year     string `form:"year" json:"year" xml:"year"  binding:"required"`
+	Year     string `form:"year" json:"year" xml:"year"`
 	Semester string `form:"semester" json:"semester" xml:"semester"  binding:"required"`
 }
 
 func GetAttendanceWithOptions(c *gin.Context) {
-
-	credential := c.GetHeader("CredentialOld")
-	cookies, err := tools.ConvertToCookies(credential)
-	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
-		return
-	}
-
+	cookies := c.MustGet("CredentialOldCookies").([]*http.Cookie)
 	var optionData AttendanceOption
 	if err := c.ShouldBindJSON(&optionData); err != nil {
 		c.String(http.StatusBadRequest,
 			`Empty or malformed option data.
 			비어 있거나 올바르지 않은 조건 데이터 입니다.`)
 		return
+	}
+
+	if optionData.Year == "" {
+		optionData.Year = strconv.Itoa(time.Now().Year())
 	}
 
 	// Options for custom user agent
@@ -86,7 +77,6 @@ func GetAttendanceWithOptions(c *gin.Context) {
 			}
 		}()
 	})
-	var content string
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.ForestURL),
 		chromedp.ActionFunc(func(context context.Context) error {
@@ -115,13 +105,32 @@ func GetAttendanceWithOptions(c *gin.Context) {
 		chromedp.WaitVisible(`txtYy`, chromedp.ByID),
 		chromedp.SetValue(`#txtYy`, optionData.Year, chromedp.ByQuery),
 		chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
-		chromedp.Click(`#btnList`, chromedp.ByQuery),
-		chromedp.Sleep(300 * time.Millisecond),
-		chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
 	})
-	fmt.Println(content)
-	c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
-	return
+
+	dataLoaded := make(chan string)
+
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		go func(data chan string) {
+			if ev, ok := ev.(*network.EventResponseReceived); ok {
+				fmt.Println(ev.Response.URL)
+				if ev.Response.URL == targetURL {
+					var content string
+					chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
+					data <- content
+				}
+			}
+		}(dataLoaded)
+	})
+
+	chromedp.Run(ctx, chromedp.Tasks{
+		chromedp.Click(`#btnList`, chromedp.ByQuery),
+	})
+
+	select {
+	case content := <-dataLoaded:
+		c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+		return
+	}
 }
 
 func extractData(body io.Reader) map[string]interface{} {

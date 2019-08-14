@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/network"
@@ -18,44 +17,31 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
-var targetURL = fmt.Sprintf("%s/GATE/SAM/LECTURE/S/SSGS09S.ASPX?&maincd=O&systemcd=S&seq=1", consts.ForestURL)
+var targetURL = fmt.Sprintf("%s/GATE/SAM/LECTURE/S/SSGS09S.ASPX?maincd=O&systemcd=S&seq=1", consts.ForestURL)
 
 func GetSubjects(c *gin.Context) {
-	credential := c.GetHeader("CredentialOld")
-	_, err := tools.ConvertToCookies(credential)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", targetURL, nil)
+	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
+	res, err := client.Do(req)
 	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
+		c.String(http.StatusInternalServerError, consts.InternalError)
 		return
 	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", targetURL, nil)
-	req.Header.Add("Cookie", credential)
-	res, err := client.Do(req)
 	defer res.Body.Close()
 
 	c.JSON(http.StatusOK, extractData(tools.EucKrReaderToUtf8Reader(res.Body)))
 }
 
 type SubjectOption struct {
-	Year      string `form:"year" json:"year" xml:"year"  binding:"required"`
-	Semester  string `form:"semester" json:"semester" xml:"semester"  binding:"required"`
-	Major     string `form:"major" json:"major" xml:"major"  binding:"required"`
-	Professor string `form:"professor" json:"professor" xml:"professor"  binding:"required"`
+	Year      string `form:"year" json:"year" xml:"year" binding:"required"`
+	Semester  string `form:"semester" json:"semester" xml:"semester" binding:"required"`
+	Major     string `form:"major" json:"major" xml:"major" binding:"required"`
+	Professor string `form:"professor" json:"professor" xml:"professor"`
 }
 
 func GetSubjectsWithOptions(c *gin.Context) {
-	credential := c.GetHeader("CredentialOld")
-	cookies, err := tools.ConvertToCookies(credential)
-	if err != nil {
-		c.String(http.StatusBadRequest,
-			`Empty or malformed credential data.
-			비어 있거나 올바르지 않은 인증 데이터 입니다.`)
-		return
-	}
-
+	cookies := c.MustGet("CredentialOldCookies").([]*http.Cookie)
 	var optionData SubjectOption
 	if err := c.ShouldBindJSON(&optionData); err != nil {
 		c.String(http.StatusBadRequest,
@@ -67,7 +53,7 @@ func GetSubjectsWithOptions(c *gin.Context) {
 	// Options for custom user agent
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.UserAgent(consts.UserAgentIE),
-		// chromedp.Flag("headless", false)
+		// chromedp.Flag("headless", false),
 	)
 
 	// Create contexts
@@ -87,7 +73,6 @@ func GetSubjectsWithOptions(c *gin.Context) {
 			}
 		}()
 	})
-	var content string
 	chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.ForestURL),
 		chromedp.ActionFunc(func(context context.Context) error {
@@ -118,13 +103,26 @@ func GetSubjectsWithOptions(c *gin.Context) {
 		chromedp.SetValue(`#ddlHaggi`, optionData.Semester, chromedp.ByQuery),
 		chromedp.SetValue(`#ddlSosog`, optionData.Major, chromedp.ByQuery),
 		chromedp.SetValue(`#txtPermNm`, optionData.Professor, chromedp.ByQuery),
-		chromedp.Click(`#CSMenuButton1_List`, chromedp.ByQuery),
-		chromedp.Sleep(300 * time.Millisecond),
-		chromedp.InnerHTML(`body`, &content, chromedp.ByQuery),
 	})
-	fmt.Println(content)
-	c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
-	return
+
+	dataLoaded := make(chan string)
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		go func(data chan string) {
+			if _, ok := ev.(*network.EventLoadingFinished); ok {
+				var content string
+				chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
+				data <- content
+			}
+		}(dataLoaded)
+	})
+
+	chromedp.Run(ctx, chromedp.Click(`#CSMenuButton1_List`, chromedp.ByQuery))
+	select {
+	case content := <-dataLoaded:
+		c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
+		return
+	}
+
 }
 
 func extractData(body io.Reader) map[string]interface{} {
@@ -134,22 +132,20 @@ func extractData(body io.Reader) map[string]interface{} {
 	}
 	list := []gin.H{}
 	doc.Find("#dgList > tbody > tr").Each(func(i int, item *goquery.Selection) {
-		if i > 0 && i < 13 {
-			list = append(list, gin.H{
-				"type":        item.Children().Eq(0).Text(),
-				"grade":       item.Children().Eq(1).Text(),
-				"code":        item.Children().Eq(2).Text(),
-				"class":       item.Children().Eq(3).Text(),
-				"subject":     item.Children().Eq(4).Text(),
-				"score":       item.Children().Eq(5).Text(),
-				"professor":   item.Children().Eq(6).Text(),
-				"grade_limit": item.Children().Eq(7).Text(),
-				"major_limit": item.Children().Eq(8).Text(),
-				"time":        item.Children().Eq(9).Text(),
-				"note":        item.Children().Eq(10).Text(),
-				"available":   item.Children().Eq(11).Text(),
-			})
-		}
+		list = append(list, gin.H{
+			"type":        item.Children().Eq(0).Text(),
+			"grade":       item.Children().Eq(1).Text(),
+			"code":        item.Children().Eq(2).Text(),
+			"class":       item.Children().Eq(3).Text(),
+			"subject":     item.Children().Eq(4).Text(),
+			"score":       item.Children().Eq(5).Text(),
+			"professor":   item.Children().Eq(6).Text(),
+			"grade_limit": item.Children().Eq(7).Text(),
+			"major_limit": item.Children().Eq(8).Text(),
+			"time":        item.Children().Eq(9).Text(),
+			"note":        item.Children().Eq(10).Text(),
+			"available":   item.Children().Eq(11).Text(),
+		})
 	})
 
 	semesterOptions := []gin.H{}
