@@ -39,10 +39,12 @@ func GetSchedulesWithOptions(c *gin.Context) {
 
 	schedules := []gin.H{}
 	doc.Find("div.info > table > tbody > tr").Each(func(i int, item *goquery.Selection) {
-		schedules = append(schedules, gin.H{
-			"period":  item.Children().Eq(0).Text(),
-			"content": item.Children().Eq(1).Text(),
-		})
+		if i > 0 {
+			schedules = append(schedules, gin.H{
+				"period":  item.Children().Eq(0).Text(),
+				"content": item.Children().Eq(1).Text(),
+			})
+		}
 	})
 
 	c.JSON(http.StatusOK, gin.H{
