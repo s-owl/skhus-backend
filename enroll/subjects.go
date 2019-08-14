@@ -132,22 +132,20 @@ func extractData(body io.Reader) map[string]interface{} {
 	}
 	list := []gin.H{}
 	doc.Find("#dgList > tbody > tr").Each(func(i int, item *goquery.Selection) {
-		if i >= 0 && i < 13 {
-			list = append(list, gin.H{
-				"type":        item.Children().Eq(0).Text(),
-				"grade":       item.Children().Eq(1).Text(),
-				"code":        item.Children().Eq(2).Text(),
-				"class":       item.Children().Eq(3).Text(),
-				"subject":     item.Children().Eq(4).Text(),
-				"score":       item.Children().Eq(5).Text(),
-				"professor":   item.Children().Eq(6).Text(),
-				"grade_limit": item.Children().Eq(7).Text(),
-				"major_limit": item.Children().Eq(8).Text(),
-				"time":        item.Children().Eq(9).Text(),
-				"note":        item.Children().Eq(10).Text(),
-				"available":   item.Children().Eq(11).Text(),
-			})
-		}
+		list = append(list, gin.H{
+			"type":        item.Children().Eq(0).Text(),
+			"grade":       item.Children().Eq(1).Text(),
+			"code":        item.Children().Eq(2).Text(),
+			"class":       item.Children().Eq(3).Text(),
+			"subject":     item.Children().Eq(4).Text(),
+			"score":       item.Children().Eq(5).Text(),
+			"professor":   item.Children().Eq(6).Text(),
+			"grade_limit": item.Children().Eq(7).Text(),
+			"major_limit": item.Children().Eq(8).Text(),
+			"time":        item.Children().Eq(9).Text(),
+			"note":        item.Children().Eq(10).Text(),
+			"available":   item.Children().Eq(11).Text(),
+		})
 	})
 
 	semesterOptions := []gin.H{}
