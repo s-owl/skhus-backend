@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"errors"
+	"sync/atomic"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -19,11 +21,41 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 로그인 정보(아이디, 비번)
 type LoginData struct {
 	Userid string `form:"userid" json:"userid" xml:"userid"  binding:"required"`
 	Userpw string `form:"userpw" json:"userpw" xml:"userpw"  binding:"required"`
 }
 
+// 로그인 결과
+type LoginResult interface {
+	Err() error
+}
+
+// forest 로그인 결과
+type OldLoginResult struct {
+	CredentialOld	string
+	err	error
+}
+
+// 에러
+func (res *OldLoginResult) Err() error {
+	return res.err
+}
+
+// sam 로그인 결과
+type NewLoginResult struct {
+	CredentialNew	string
+	CredentialNewToken	string
+	err error
+}
+
+// 에러
+func (res *NewLoginResult) Err() error {
+	return res.err
+}
+
+// 전체 로그인
 func Login(c *gin.Context) {
 
 	var loginData LoginData
@@ -51,63 +83,85 @@ func Login(c *gin.Context) {
 	allocCtx, cancelCtx := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancelCtx()
 	forestCtx, cancelForestCtx := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
-	defer cancelForestCtx()
 	samCtx, cancelSamCtx := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
-	defer cancelSamCtx()
 
-	credentialOldChan := make(chan string)
-	credentialNewChan := make(chan string)
-	credentialNewTokenChan := make(chan string)
-	loginErrorChan := make(chan string)
+	loginResultChan := make(chan LoginResult, 2)
 
-	var credentialOld, credentialNew, credentialNewToken string
+	var oldLoginResult *OldLoginResult
+	var newLoginResult *NewLoginResult
 
-	go loginOnForest(forestCtx, &loginData, credentialOldChan, loginErrorChan)
-	go loginOnSam(samCtx, &loginData, credentialNewChan, credentialNewTokenChan, loginErrorChan)
+	var runner int32
+	go loginOnForest(forestCtx, &loginData, loginResultChan, &runner)
+	go loginOnSam(samCtx, &loginData, loginResultChan, &runner)
 
-CREDENTIALS:
 	for {
-		select {
-		case errorMsg := <-loginErrorChan:
-			c.String(http.StatusUnauthorized, errorMsg)
+		res := <-loginResultChan
+		if err := res.Err(); err != nil {
+			c.String(http.StatusUnauthorized, err.Error())
+			cancelSamCtx()
+			cancelForestCtx()
 			return
-		case credentialOld = <-credentialOldChan:
-			fmt.Println("CredentialOld Received")
-			if credentialNew != "" && credentialNewToken != "" {
-				break CREDENTIALS
-			}
-		case credentialNew = <-credentialNewChan:
-			fmt.Println("CredentialNew Received")
-			if credentialOld != "" && credentialNewToken != "" {
-				break CREDENTIALS
-			}
-		case credentialNewToken = <-credentialNewTokenChan:
-			fmt.Println("CredentialNewToken Received")
-			if credentialOld != "" && credentialNew != "" {
-				break CREDENTIALS
-			}
+		}
+		switch r := res.(type) {
+			case *OldLoginResult:
+			oldLoginResult = r
+			fmt.Println("OldLogin Complete")
+			cancelForestCtx()
+			case *NewLoginResult:
+			newLoginResult = r
+			fmt.Println("NewLogin Complete")
+			cancelSamCtx()
+		}
+		if oldLoginResult != nil && newLoginResult != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"credential-old":       (*oldLoginResult).CredentialOld,
+				"credential-new":       (*newLoginResult).CredentialNew,
+				"credential-new-token": (*newLoginResult).CredentialNewToken,
+			})
+			return
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"credential-old":       credentialOld,
-		"credential-new":       credentialNew,
-		"credential-new-token": credentialNewToken,
-	})
-	return
+}
+
+func startLogin(runner *int32) {
+	atomic.AddInt32(runner, 1)
+}
+
+func completeLogin(runner *int32, ch chan LoginResult) {
+	current := atomic.AddInt32(runner, -1)
+	if current == 0 {
+		close(ch)
+	}
+}
+
+func errorLogin(runner *int32, ch chan LoginResult) {
+	atomic.StoreInt32(runner, 0)
+	close(ch)
 }
 
 func loginOnForest(ctx context.Context, loginData *LoginData,
-	credentialOld chan string, loginError chan string) {
-	loginPageURL := fmt.Sprintf("%s/Gate/UniLogin.aspx", consts.ForestURL)
-	agreementPageURL := fmt.Sprintf("%s/Gate/CORE/P/CORP02P.aspx", consts.ForestURL)
-	mainPageURL := fmt.Sprintf("%s/Gate/UniMyMain.aspx", consts.ForestURL)
+	loginResult chan LoginResult, runner *int32) {
+	startLogin(runner)
+	loginPageURL := consts.ForestURL + "/Gate/UniLogin.aspx"
+	agreementPageURL :=  consts.ForestURL + "/Gate/CORE/P/CORP02P.aspx"
+	mainPageURL := consts.ForestURL + "/Gate/UniMyMain.aspx"
 	triedLogin := false
 	isCredentialSent := false
+
+	errorResult := func(errorMsg string) LoginResult {
+		return &OldLoginResult{
+			CredentialOld: "",
+			err: errors.New(errorMsg),
+		}
+	}
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
 			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
+				if len(targets) == 0 {
+					return
+				}
 				currentURL := targets[0].URL
 				fmt.Println("Page URL", currentURL)
 				switch currentURL {
@@ -116,14 +170,16 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 						errorMsg :=
 							`Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
 							로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
-						loginError <- errorMsg
+						loginResult <- errorResult(errorMsg)
+						errorLogin(runner, loginResult)
 						break
 					}
 				case agreementPageURL:
 					errorMsg :=
 						`Please complete the privacy policy agreement on forest.skhu.ac.kr
 						forest.skhu.ac.kr 에서 개인정보 제공 동의를 먼저 완료해 주세요.`
-					loginError <- errorMsg
+						loginResult <- errorResult(errorMsg)
+						errorLogin(runner, loginResult)
 					break
 				case mainPageURL:
 					fmt.Println("Logged in on forest")
@@ -142,7 +198,11 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 							result := buf.String()
 							fmt.Println(result)
 
-							credentialOld <- result
+							loginResult <- &OldLoginResult{
+								CredentialOld: result,
+								err: nil,
+							}
+							completeLogin(runner, loginResult)
 							isCredentialSent = true
 							return nil
 						}))
@@ -163,8 +223,8 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 }
 
 func loginOnSam(ctx context.Context, loginData *LoginData,
-	credentialNew chan string, credentialNewToken chan string,
-	loginError chan string) {
+	loginResult chan LoginResult, runner *int32) {
+	startLogin(runner)
 	isCredentialSent := false
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
@@ -201,10 +261,15 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 								result := buf.String()
 								fmt.Println(result)
 
-								credentialNew <- result
-								if tokenOK {
-									credentialNewToken <- tmpToken
+								login := &NewLoginResult{
+									CredentialNew: result,
+									err: nil,
 								}
+								if tokenOK {
+									 login.CredentialNewToken = tmpToken
+								}
+								loginResult <- login
+								completeLogin(runner, loginResult)
 								isCredentialSent = true
 								return nil
 							}),
@@ -216,7 +281,10 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 					errorMsg :=
 						`Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
 						로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
-					loginError <- errorMsg
+					loginResult <- &NewLoginResult{
+						err: errors.New(errorMsg),
+					}
+					errorLogin(runner, loginResult)
 				}
 			}
 		}()
