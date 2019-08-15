@@ -58,42 +58,42 @@ func Login(c *gin.Context) {
 	credentialOldChan := make(chan string)
 	credentialNewChan := make(chan string)
 	credentialNewTokenChan := make(chan string)
+	defer close(credentialOldChan)
+	defer close(credentialNewChan)
+	defer close(credentialNewTokenChan)
+
 	loginErrorChan := make(chan string)
+	defer close(loginErrorChan)
 
 	var credentialOld, credentialNew, credentialNewToken string
 
 	go loginOnForest(forestCtx, &loginData, credentialOldChan, loginErrorChan)
 	go loginOnSam(samCtx, &loginData, credentialNewChan, credentialNewTokenChan, loginErrorChan)
 
-CREDENTIALS:
 	for {
 		select {
 		case errorMsg := <-loginErrorChan:
 			c.String(http.StatusUnauthorized, errorMsg)
 			return
-		case credentialOld = <-credentialOldChan:
-			fmt.Println("CredentialOld Received")
-			if credentialNew != "" && credentialNewToken != "" {
-				break CREDENTIALS
-			}
-		case credentialNew = <-credentialNewChan:
-			fmt.Println("CredentialNew Received")
-			if credentialOld != "" && credentialNewToken != "" {
-				break CREDENTIALS
-			}
-		case credentialNewToken = <-credentialNewTokenChan:
-			fmt.Println("CredentialNewToken Received")
-			if credentialOld != "" && credentialNew != "" {
-				break CREDENTIALS
-			}
+		case data := <-credentialOldChan:
+			fmt.Println("CredentialOld")
+			credentialOld = data
+		case data := <-credentialNewChan:
+			fmt.Println("CredentialNew")
+			credentialNew = data
+		case data := <-credentialNewTokenChan:
+			fmt.Println("CredentialNewToken")
+			credentialNewToken = data
+		}
+		if credentialOld != "" && credentialNew != "" && credentialNewToken != "" {
+			c.JSON(http.StatusOK, gin.H{
+				"credential-old":       credentialOld,
+				"credential-new":       credentialNew,
+				"credential-new-token": credentialNewToken,
+			})
+			return
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"credential-old":       credentialOld,
-		"credential-new":       credentialNew,
-		"credential-new-token": credentialNewToken,
-	})
-	return
 }
 
 func loginOnForest(ctx context.Context, loginData *LoginData,
