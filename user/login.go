@@ -21,34 +21,41 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 로그인 정보(아이디, 비번)
 type LoginData struct {
 	Userid string `form:"userid" json:"userid" xml:"userid"  binding:"required"`
 	Userpw string `form:"userpw" json:"userpw" xml:"userpw"  binding:"required"`
 }
 
+// 로그인 결과
 type LoginResult interface {
 	Err() error
 }
 
+// forest 로그인 결과
 type OldLoginResult struct {
 	CredentialOld	string
 	err	error
 }
 
+// 에러
 func (res *OldLoginResult) Err() error {
 	return res.err
 }
 
+// sam 로그인 결과
 type NewLoginResult struct {
 	CredentialNew	string
 	CredentialNewToken	string
 	err error
 }
 
+// 에러
 func (res *NewLoginResult) Err() error {
 	return res.err
 }
 
+// 전체 로그인
 func Login(c *gin.Context) {
 
 	var loginData LoginData
@@ -83,7 +90,7 @@ func Login(c *gin.Context) {
 	var oldLoginResult *OldLoginResult
 	var newLoginResult *NewLoginResult
 
-	var runner int32 = 0
+	var runner int32
 	go loginOnForest(forestCtx, &loginData, loginResultChan, &runner)
 	go loginOnSam(samCtx, &loginData, loginResultChan, &runner)
 
