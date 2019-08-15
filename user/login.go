@@ -58,10 +58,6 @@ func Login(c *gin.Context) {
 	credentialOldChan := make(chan string)
 	credentialNewChan := make(chan string)
 	credentialNewTokenChan := make(chan string)
-	defer close(credentialOldChan)
-	defer close(credentialNewChan)
-	defer close(credentialNewTokenChan)
-
 	loginErrorChan := make(chan string)
 	defer close(loginErrorChan)
 
@@ -143,6 +139,7 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 							fmt.Println(result)
 
 							credentialOld <- result
+							close(credentialOld)
 							isCredentialSent = true
 							return nil
 						}))
@@ -202,8 +199,10 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 								fmt.Println(result)
 
 								credentialNew <- result
+								close(credentialNew)
 								if tokenOK {
 									credentialNewToken <- tmpToken
+									close(credentialNewToken)
 								}
 								isCredentialSent = true
 								return nil
