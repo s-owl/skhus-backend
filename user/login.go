@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/s-owl/skhus-backend/consts"
+	"github.com/s-owl/skhus-backend/browser"
 
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/network"
@@ -43,16 +43,11 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Options for custom user agent
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.UserAgent(consts.UserAgentIE))
-
 	// Create contexts
-	allocCtx, cancelCtx := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancelCtx()
-	forestCtx, cancelForestCtx := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	brow := browser.New()
+	forestCtx, cancelForestCtx := brow.NewContext()
 	defer cancelForestCtx()
-	samCtx, cancelSamCtx := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	samCtx, cancelSamCtx := brow.NewContext()
 	defer cancelSamCtx()
 
 	credentialOldChan := make(chan string)
