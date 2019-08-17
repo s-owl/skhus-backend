@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"errors"
 	"strings"
 	"unicode/utf8"
 
@@ -43,6 +44,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	if res, err := runLogin(&loginData); err != nil {
+		c.String(http.StatusUnauthorized, err.Error())
+	} else {
+		c.JSON(http.StatusOK, res)
+	}
+	return
+}
+
+func runLogin(loginData *LoginData) (interface{}, error) {
 	// Create contexts
 	brow := browser.New()
 	forestCtx, cancelForestCtx := brow.NewContext()
@@ -57,38 +67,30 @@ func Login(c *gin.Context) {
 
 	var credentialOld, credentialNew, credentialNewToken string
 
-	go loginOnForest(forestCtx, &loginData, credentialOldChan, loginErrorChan)
-	go loginOnSam(samCtx, &loginData, credentialNewChan, credentialNewTokenChan, loginErrorChan)
+	go loginOnForest(forestCtx, loginData, credentialOldChan, loginErrorChan)
+	go loginOnSam(samCtx, loginData, credentialNewChan, credentialNewTokenChan, loginErrorChan)
 
-CREDENTIALS:
 	for {
 		select {
 		case errorMsg := <-loginErrorChan:
-			c.String(http.StatusUnauthorized, errorMsg)
-			return
+			return nil, errors.New(errorMsg)
 		case credentialOld = <-credentialOldChan:
 			fmt.Println("CredentialOld Received")
-			if credentialNew != "" && credentialNewToken != "" {
-				break CREDENTIALS
-			}
 		case credentialNew = <-credentialNewChan:
 			fmt.Println("CredentialNew Received")
-			if credentialOld != "" && credentialNewToken != "" {
-				break CREDENTIALS
-			}
 		case credentialNewToken = <-credentialNewTokenChan:
 			fmt.Println("CredentialNewToken Received")
-			if credentialOld != "" && credentialNew != "" {
-				break CREDENTIALS
-			}
+		}
+		if credentialOld != "" && credentialNew != "" && credentialNewToken != "" {
+			break
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
+
+	return gin.H{
 		"credential-old":       credentialOld,
 		"credential-new":       credentialNew,
 		"credential-new-token": credentialNewToken,
-	})
-	return
+	}, nil
 }
 
 func loginOnForest(ctx context.Context, loginData *LoginData,
