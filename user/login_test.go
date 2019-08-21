@@ -12,6 +12,6 @@ func BenchmarkLogin(b *testing.B) {
 	}
 
 	for i := 0; i < 10; i++ {
-		runLogin(&loginData)
+		runLogin(loginData)
 	}
 }

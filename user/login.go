@@ -1,28 +1,64 @@
 package user
 
 import (
+	"fmt"
+	"sync"
 	"bytes"
 	"context"
-	"fmt"
-	"net/http"
-	"errors"
 	"strings"
-	"unicode/utf8"
+	"net/http"
 
 	"github.com/s-owl/skhus-backend/consts"
 	"github.com/s-owl/skhus-backend/browser"
 
-	"github.com/chromedp/cdproto/dom"
-	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/page"
+	"github.com/gin-gonic/gin"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
-	"github.com/gin-gonic/gin"
+	"github.com/chromedp/cdproto/dom"
+	"github.com/chromedp/cdproto/page"
+	"github.com/chromedp/cdproto/network"
 )
 
 type LoginData struct {
 	Userid string `form:"userid" json:"userid" xml:"userid"  binding:"required"`
 	Userpw string `form:"userpw" json:"userpw" xml:"userpw"  binding:"required"`
+}
+
+type LoginError uint8
+
+const (
+	_ = iota
+	WrongForm LoginError = iota
+	ForestError
+	ForestAgree
+	SamError
+)
+
+func (code LoginError) Error() string {
+	var msg string
+	switch code {
+	case WrongForm:
+		msg = `ID or PW is empty. Or PW is shorter then 8 digits.
+			If your using password with less then 8 digits, please change it at forest.skhu.ac.kr
+			학번 또는 비밀번호가 비어있거나 비밀번호가 8자리 미만 입니다.
+			8자리 미만 비밀번호 사용 시, forest.skhu.ac.kr 에서 변경 후 사용해 주세요.`
+	case ForestError:
+		msg = `Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
+			로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+	case ForestAgree:
+		msg = `Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
+			로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+	case SamError:
+		msg = `Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
+			로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+	}
+	return msg
+}
+
+type LoginResult struct {
+	Credentials map[string]string
+	Err LoginError
+	sync.WaitGroup
 }
 
 func Login(c *gin.Context) {
@@ -35,16 +71,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	if utf8.RuneCountInString(loginData.Userid) < 1 || utf8.RuneCountInString(loginData.Userpw) < 8 {
-		c.String(http.StatusBadRequest,
-			`ID or PW is empty. Or PW is shorter then 8 digits.
-			If your using password with less then 8 digits, please change it at forest.skhu.ac.kr
-			학번 또는 비밀번호가 비어있거나 비밀번호가 8자리 미만 입니다.
-			8자리 미만 비밀번호 사용 시, forest.skhu.ac.kr 에서 변경 후 사용해 주세요.`)
-		return
-	}
-
-	if res, err := runLogin(&loginData); err != nil {
+	if res, err := runLogin(loginData); err != 0 {
 		c.String(http.StatusUnauthorized, err.Error())
 	} else {
 		c.JSON(http.StatusOK, res)
@@ -52,7 +79,7 @@ func Login(c *gin.Context) {
 	return
 }
 
-func runLogin(loginData *LoginData) (interface{}, error) {
+func runLogin(loginData LoginData) (map[string]string, LoginError) {
 	// Create contexts
 	brow := browser.New()
 	forestCtx, cancelForestCtx := brow.NewContext()
@@ -60,44 +87,27 @@ func runLogin(loginData *LoginData) (interface{}, error) {
 	samCtx, cancelSamCtx := brow.NewContext()
 	defer cancelSamCtx()
 
-	credentialOldChan := make(chan string)
-	credentialNewChan := make(chan string)
-	credentialNewTokenChan := make(chan string)
-	loginErrorChan := make(chan string)
-
-	var credentialOld, credentialNew, credentialNewToken string
-
-	go loginOnForest(forestCtx, loginData, credentialOldChan, loginErrorChan)
-	go loginOnSam(samCtx, loginData, credentialNewChan, credentialNewTokenChan, loginErrorChan)
-
-	for {
-		select {
-		case errorMsg := <-loginErrorChan:
-			return nil, errors.New(errorMsg)
-		case credentialOld = <-credentialOldChan:
-			fmt.Println("CredentialOld Received")
-		case credentialNew = <-credentialNewChan:
-			fmt.Println("CredentialNew Received")
-		case credentialNewToken = <-credentialNewTokenChan:
-			fmt.Println("CredentialNewToken Received")
-		}
-		if credentialOld != "" && credentialNew != "" && credentialNewToken != "" {
-			break
-		}
+	loginResult := LoginResult {
+		Credentials: make(map[string]string),
 	}
 
-	return gin.H{
-		"credential-old":       credentialOld,
-		"credential-new":       credentialNew,
-		"credential-new-token": credentialNewToken,
-	}, nil
+	loginResult.Add(2)
+	go loginOnForest(forestCtx, loginData, &loginResult)
+	go loginOnSam(samCtx, loginData, &loginResult)
+
+	loginResult.Wait()
+	if loginResult.Err != 0 {
+		return nil, loginResult.Err
+	}
+
+	return loginResult.Credentials, 0
 }
 
-func loginOnForest(ctx context.Context, loginData *LoginData,
-	credentialOld chan string, loginError chan string) {
-	loginPageURL := fmt.Sprintf("%s/Gate/UniLogin.aspx", consts.ForestURL)
-	agreementPageURL := fmt.Sprintf("%s/Gate/CORE/P/CORP02P.aspx", consts.ForestURL)
-	mainPageURL := fmt.Sprintf("%s/Gate/UniMyMain.aspx", consts.ForestURL)
+func loginOnForest(ctx context.Context, loginData LoginData,
+	loginResult *LoginResult) {
+	loginPageURL := consts.ForestURL + "/Gate/UniLogin.aspx"
+	agreementPageURL := consts.ForestURL + "/Gate/CORE/P/CORP02P.aspx"
+	mainPageURL := consts.ForestURL + "/Gate/UniMyMain.aspx"
 	triedLogin := false
 	isCredentialSent := false
 
@@ -110,36 +120,33 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 				switch currentURL {
 				case loginPageURL:
 					if triedLogin {
-						errorMsg :=
-							`Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
-							로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
-						loginError <- errorMsg
+						defer loginResult.Done()
+						loginResult.Err = ForestError
 						break
 					}
 				case agreementPageURL:
-					errorMsg :=
-						`Please complete the privacy policy agreement on forest.skhu.ac.kr
-						forest.skhu.ac.kr 에서 개인정보 제공 동의를 먼저 완료해 주세요.`
-					loginError <- errorMsg
+					defer loginResult.Done()
+					loginResult.Err = ForestAgree
 					break
 				case mainPageURL:
 					fmt.Println("Logged in on forest")
 					if !isCredentialSent {
-
 						chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 							cookies, err := network.GetAllCookies().Do(ctx)
 							if err != nil {
 								return err
 							}
 
+							defer loginResult.Done()
+
 							var buf bytes.Buffer
 							for _, cookie := range cookies {
-								buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
+								buf.WriteString(cookie.Name + "=" + cookie.Value + ";")
 							}
 							result := buf.String()
 							fmt.Println(result)
 
-							credentialOld <- result
+							loginResult.Credentials["credential-old"] = result
 							isCredentialSent = true
 							return nil
 						}))
@@ -159,9 +166,8 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 	triedLogin = true
 }
 
-func loginOnSam(ctx context.Context, loginData *LoginData,
-	credentialNew chan string, credentialNewToken chan string,
-	loginError chan string) {
+func loginOnSam(ctx context.Context, loginData LoginData,
+	loginResult *LoginResult) {
 	isCredentialSent := false
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
@@ -190,17 +196,18 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 									return err
 								}
 
+								defer loginResult.Done()
 								var buf bytes.Buffer
 								for _, cookie := range cookies {
-									buf.WriteString(fmt.Sprintf("%s=%s;", cookie.Name, cookie.Value))
+									buf.WriteString(cookie.Name + "=" + cookie.Value + ";")
 								}
 
 								result := buf.String()
 								fmt.Println(result)
 
-								credentialNew <- result
+								loginResult.Credentials["credential-new"] = result
 								if tokenOK {
-									credentialNewToken <- tmpToken
+									loginResult.Credentials["credential-new-token"] = result
 								}
 								isCredentialSent = true
 								return nil
@@ -210,10 +217,9 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 				}
 			} else if ev, ok := ev.(*dom.EventAttributeModified); ok {
 				if ev.Name == "class" && ev.Value == "ng-scope modal-open" {
-					errorMsg :=
-						`Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
-						로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
-					loginError <- errorMsg
+					defer loginResult.Done()
+					loginResult.Err = SamError
+					return
 				}
 			}
 		}()
