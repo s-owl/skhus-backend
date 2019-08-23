@@ -1,7 +1,7 @@
 package user
 
 import (
-	"fmt"
+	"log"
 	"sync"
 	"bytes"
 	"context"
@@ -19,11 +19,13 @@ import (
 	"github.com/chromedp/cdproto/network"
 )
 
+// LoginData 로그인 요청 데이터
 type LoginData struct {
 	Userid string `form:"userid" json:"userid" xml:"userid"  binding:"required"`
 	Userpw string `form:"userpw" json:"userpw" xml:"userpw"  binding:"required"`
 }
 
+// LoginError 로그인 에러를 확인하기 위한 타입
 type LoginError uint8
 
 const (
@@ -34,6 +36,7 @@ const (
 	SamError
 )
 
+// Error 에러 메세지를 출력
 func (code LoginError) Error() string {
 	var msg string
 	switch code {
@@ -55,14 +58,16 @@ func (code LoginError) Error() string {
 	return msg
 }
 
+// LoginResult 로그인 결과를 모으는 객체입니다.
 type LoginResult struct {
 	Credentials map[string]string
 	Err LoginError
-	sync.WaitGroup
+	TriedForest bool
+	*sync.WaitGroup
 }
 
+// Login 요청을 받아서 처리하는 함수
 func Login(c *gin.Context) {
-
 	var loginData LoginData
 	if err := c.ShouldBindJSON(&loginData); err != nil {
 		c.String(http.StatusBadRequest,
@@ -87,13 +92,14 @@ func runLogin(loginData LoginData) (map[string]string, LoginError) {
 	samCtx, cancelSamCtx := brow.NewContext()
 	defer cancelSamCtx()
 
-	loginResult := LoginResult {
+	loginResult := &LoginResult {
 		Credentials: make(map[string]string),
+		WaitGroup: new(sync.WaitGroup),
 	}
 
 	loginResult.Add(2)
-	go loginOnForest(forestCtx, loginData, &loginResult)
-	go loginOnSam(samCtx, loginData, &loginResult)
+	go loginOnForest(forestCtx, loginData, loginResult)
+	go loginOnSam(samCtx, loginData, loginResult)
 
 	loginResult.Wait()
 	if loginResult.Err != 0 {
@@ -108,18 +114,16 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 	loginPageURL := consts.ForestURL + "/Gate/UniLogin.aspx"
 	agreementPageURL := consts.ForestURL + "/Gate/CORE/P/CORP02P.aspx"
 	mainPageURL := consts.ForestURL + "/Gate/UniMyMain.aspx"
-	triedLogin := false
-	isCredentialSent := false
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
 			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
 				currentURL := targets[0].URL
-				fmt.Println("Page URL", currentURL)
+				log.Printf("Page URL", currentURL)
 				switch currentURL {
 				case loginPageURL:
-					if triedLogin {
+					if loginResult.TriedForest {
 						defer loginResult.Done()
 						loginResult.Err = ForestError
 						break
@@ -129,8 +133,8 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 					loginResult.Err = ForestAgree
 					break
 				case mainPageURL:
-					fmt.Println("Logged in on forest")
-					if !isCredentialSent {
+					log.Printf("Logged in on forest")
+					if _, ok = loginResult.Credentials["credential-old"]; !ok {
 						chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 							cookies, err := network.GetAllCookies().Do(ctx)
 							if err != nil {
@@ -144,10 +148,9 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 								buf.WriteString(cookie.Name + "=" + cookie.Value + ";")
 							}
 							result := buf.String()
-							fmt.Println(result)
+							log.Printf(result)
 
 							loginResult.Credentials["credential-old"] = result
-							isCredentialSent = true
 							return nil
 						}))
 					}
@@ -163,29 +166,28 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 		chromedp.SetValue(`txtPW`, loginData.Userpw, chromedp.ByID),
 		chromedp.SendKeys(`txtPW`, kb.Enter, chromedp.ByID),
 	})
-	triedLogin = true
+	loginResult.TriedForest = true
 }
 
 func loginOnSam(ctx context.Context, loginData LoginData,
 	loginResult *LoginResult) {
-	isCredentialSent := false
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
 				targets, _ := chromedp.Targets(ctx)
 				currentURL := targets[0].URL
-				fmt.Println("Page URL", currentURL)
+				log.Printf("Page URL", currentURL)
 				switch {
 				case strings.HasPrefix(currentURL, consts.SkhuCasURL):
-					fmt.Println("Logging in on Sam...")
+					log.Printf("Logging in on Sam...")
 					chromedp.Run(ctx, chromedp.Tasks{
 						chromedp.SendKeys(`#login-username`, loginData.Userid),
 						chromedp.SendKeys(`#login-password`, loginData.Userpw),
 						chromedp.SendKeys(`login-password`, kb.Enter, chromedp.ByID),
 					})
 				case strings.HasPrefix(currentURL, consts.SkhuSamURL):
-					fmt.Println("Logged in on Sam")
-					if !isCredentialSent {
+					log.Printf("Logged in on Sam")
+					if _, ok := loginResult.Credentials["credential-new"]; !ok {
 						var tmpToken string
 						var tokenOK bool
 						chromedp.Run(ctx, chromedp.Tasks{
@@ -203,13 +205,12 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 								}
 
 								result := buf.String()
-								fmt.Println(result)
+								log.Printf(result)
 
 								loginResult.Credentials["credential-new"] = result
 								if tokenOK {
 									loginResult.Credentials["credential-new-token"] = result
 								}
-								isCredentialSent = true
 								return nil
 							}),
 						})
