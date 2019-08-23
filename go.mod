@@ -6,7 +6,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.5.0
 	github.com/chromedp/cdproto v0.0.0-20190731034908-29ad992845e9
 	github.com/chromedp/chromedp v0.3.1
-	github.com/gin-contrib/pprof v1.2.0
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.4.0
 	github.com/gobwas/ws v1.0.2 // indirect
