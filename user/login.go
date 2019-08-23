@@ -120,7 +120,7 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
 				currentURL := targets[0].URL
-				log.Printf("Page URL", currentURL)
+				log.Printf("Page URL %s", currentURL)
 				switch currentURL {
 				case loginPageURL:
 					if loginResult.TriedForest {
@@ -176,7 +176,7 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
 				targets, _ := chromedp.Targets(ctx)
 				currentURL := targets[0].URL
-				log.Printf("Page URL", currentURL)
+				log.Printf("Page URL %s", currentURL)
 				switch {
 				case strings.HasPrefix(currentURL, consts.SkhuCasURL):
 					log.Printf("Logging in on Sam...")
