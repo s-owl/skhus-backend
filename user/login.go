@@ -62,13 +62,25 @@ func (code LoginError) Error() string {
 type LoginResult struct {
 	Credentials map[string]string
 	Err LoginError
+	errMutex *sync.Mutex
 	TriedForest bool
 	*sync.WaitGroup
 }
 
+// SetError 에러를 뮤텍스를 걸은 후 쓴다.
+// 이미 에러가 있을 떄 덮어쓰지 못하게 한다.
+func (res *LoginResult) SetErr(err LoginError) {
+	res.errMutex.Lock()
+
+	if res.Err == 0 {
+		res.Err = err
+	}
+	res.errMutex.Unlock()
+}
+
 // Login 요청을 받아서 처리하는 함수
 func Login(c *gin.Context) {
-	var loginData LoginData
+	loginData := LoginData{}
 	if err := c.ShouldBindJSON(&loginData); err != nil {
 		c.String(http.StatusBadRequest,
 			`Wrong login data form.
@@ -94,6 +106,7 @@ func runLogin(loginData LoginData) (map[string]string, LoginError) {
 
 	loginResult := &LoginResult {
 		Credentials: make(map[string]string),
+		errMutex: new(sync.Mutex),
 		WaitGroup: new(sync.WaitGroup),
 	}
 
@@ -120,17 +133,17 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
 				currentURL := targets[0].URL
-				log.Printf("Page URL %s", currentURL)
+				log.Printf("Page URL " + currentURL)
 				switch currentURL {
 				case loginPageURL:
 					if loginResult.TriedForest {
 						defer loginResult.Done()
-						loginResult.Err = ForestError
+						loginResult.SetErr(ForestError)
 						break
 					}
 				case agreementPageURL:
 					defer loginResult.Done()
-					loginResult.Err = ForestAgree
+					loginResult.SetErr(ForestAgree)
 					break
 				case mainPageURL:
 					log.Printf("Logged in on forest")
@@ -176,7 +189,7 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
 				targets, _ := chromedp.Targets(ctx)
 				currentURL := targets[0].URL
-				log.Printf("Page URL %s", currentURL)
+				log.Printf("Page URL " + currentURL)
 				switch {
 				case strings.HasPrefix(currentURL, consts.SkhuCasURL):
 					log.Printf("Logging in on Sam...")
@@ -219,7 +232,7 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 			} else if ev, ok := ev.(*dom.EventAttributeModified); ok {
 				if ev.Name == "class" && ev.Value == "ng-scope modal-open" {
 					defer loginResult.Done()
-					loginResult.Err = SamError
+					loginResult.SetErr(SamError)
 					return
 				}
 			}
