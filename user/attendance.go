@@ -117,6 +117,7 @@ func GetAttendanceWithOptions(c *gin.Context) {
 					var content string
 					chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
 					data <- content
+					close(data)
 				}
 			}
 		}(dataLoaded)

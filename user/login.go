@@ -68,7 +68,7 @@ type LoginResult struct {
 	*sync.WaitGroup
 }
 
-// SetError 에러를 뮤텍스를 걸은 후 쓴다.
+// SetErr 에러를 뮤텍스를 걸은 후 쓴다.
 // 이미 에러가 있을 떄 덮어쓰지 못하게 한다.
 func (res *LoginResult) SetErr(err LoginError) {
 	res.errMutex.Lock()
