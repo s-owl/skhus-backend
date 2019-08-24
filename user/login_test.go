@@ -11,7 +11,7 @@ func BenchmarkLogin(b *testing.B) {
 		Userpw: os.Getenv("USERPW"),
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < b.N; i++ {
 		runLogin(loginData)
 	}
 }
