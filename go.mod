@@ -1,6 +1,6 @@
 module github.com/s-owl/skhus-backend
 
-go 1.12
+go 1.13rc1
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.0

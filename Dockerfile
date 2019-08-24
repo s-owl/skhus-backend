@@ -1,5 +1,5 @@
 # build stage
-FROM golang:1.12-stretch AS build
+FROM golang:1.13rc1-buster AS build
 
 RUN mkdir /build
 COPY ./ /build
@@ -7,7 +7,7 @@ WORKDIR /build
 RUN go build -o skhus-backend .
 
 # product stage
-FROM chromedp/headless-shell:latest
+FROM chromedp/headless-shell:77.0.3865.42
 
 RUN mkdir /app
 WORKDIR /app
