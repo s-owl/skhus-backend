@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 	"net/http"
+	"unicode/utf8"
 
 	"github.com/s-owl/skhus-backend/consts"
 	"github.com/s-owl/skhus-backend/browser"
@@ -97,6 +98,11 @@ func Login(c *gin.Context) {
 }
 
 func runLogin(loginData LoginData) (map[string]string, LoginError) {
+	// 로그인 데이터의 길이 최소 길이 검증
+	if utf8.RuneCountInString(loginData.Userid) < 1 || utf8.RuneCountInString(loginData.Userpw) < 8 {
+		return nil, WrongForm
+	}
+
 	// Create contexts
 	brow := browser.New()
 	forestCtx, cancelForestCtx := brow.NewContext()
