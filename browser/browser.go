@@ -17,7 +17,7 @@ type browser struct {
 
 var singletone *browser
 
-func New() *browser {
+func GetBrowser() *browser {
 	if singletone == nil {
 		// Options for custom user agent
 		opts := append(chromedp.DefaultExecAllocatorOptions[:],
