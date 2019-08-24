@@ -112,6 +112,7 @@ func GetSubjectsWithOptions(c *gin.Context) {
 				var content string
 				chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
 				data <- content
+				close(data)
 			}
 		}(dataLoaded)
 	})
@@ -122,7 +123,6 @@ func GetSubjectsWithOptions(c *gin.Context) {
 		c.JSON(http.StatusOK, extractData(strings.NewReader(content)))
 		return
 	}
-
 }
 
 func extractData(body io.Reader) map[string]interface{} {
