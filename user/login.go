@@ -43,18 +43,20 @@ func (code LoginError) Error() string {
 	switch code {
 	case WrongForm:
 		msg = `ID or PW is empty. Or PW is shorter then 8 digits.
-			If your using password with less then 8 digits, please change it at forest.skhu.ac.kr
+			If you are using password with less then 8 digits, please change it at forest.skhu.ac.kr
 			학번 또는 비밀번호가 비어있거나 비밀번호가 8자리 미만 입니다.
 			8자리 미만 비밀번호 사용 시, forest.skhu.ac.kr 에서 변경 후 사용해 주세요.`
 	case ForestError:
-		msg = `Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
-			로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+		msg = `Login Failed: Can't log in on forest.skhu.ac.kr, Check ID and PW again.
+			로그인 실패: forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
 	case ForestAgree:
-		msg = `Please complete privacy policy agreement at forest.skhu.ac.kr
+		msg = `Login Failed: Please complete privacy policy agreement at forest.skhu.ac.kr
 			로그인 실패: forest.skhu.ac.kr 에서 개인정보 제공 동의를 완료해 주세요.`
 	case SamError:
-		msg = `Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
-			로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+		msg = `Login Failed: Can't log in on sam.skhu.ac.kr, Check ID and PW again.
+			If your account only works on fores.skhu.ac.kr, Please contact Sungkonghoe University Electric Computing Center
+			로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.
+			forest.skhu.ac.kr 에서만 정상 로그인이 가능한 경우, 성공회대학교 전자계산소에 연락하세요.`
 	}
 	return msg
 }
