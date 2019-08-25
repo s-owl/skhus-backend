@@ -72,7 +72,6 @@ type LoginResult struct {
 // 이미 에러가 있을 떄 덮어쓰지 못하게 한다.
 func (res *LoginResult) SetErr(err LoginError) {
 	res.errMutex.Lock()
-
 	if res.Err == 0 {
 		res.Err = err
 	}
@@ -134,10 +133,20 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 	agreementPageURL := consts.ForestURL + "/Gate/CORE/P/CORP02P.aspx"
 	mainPageURL := consts.ForestURL + "/Gate/UniMyMain.aspx"
 
+	errorResult := func(errorMsg string) LoginResult {
+		return &OldLoginResult{
+			CredentialOld: "",
+			err: errors.New(errorMsg),
+		}
+	}
+
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
 			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
+				if len(targets) == 0 {
+					return
+				}
 				currentURL := targets[0].URL
 				log.Printf("Page URL " + currentURL)
 				switch currentURL {
@@ -168,7 +177,6 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 							}
 							result := buf.String()
 							log.Printf(result)
-
 							loginResult.Credentials["credential-old"] = result
 							return nil
 						}))
@@ -225,6 +233,7 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 
 								result := buf.String()
 								log.Printf(result)
+
 
 								loginResult.Credentials["credential-new"] = result
 								if tokenOK {
