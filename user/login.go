@@ -50,8 +50,8 @@ func (code LoginError) Error() string {
 		msg = `Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
 			로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
 	case ForestAgree:
-		msg = `Login Failed: Can't log in to forest.skhu.ac.kr, Check ID and PW again.
-			로그인 실패: (forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
+		msg = `Please complete privacy policy agreement at forest.skhu.ac.kr
+			로그인 실패: forest.skhu.ac.kr 에서 개인정보 제공 동의를 완료해 주세요.`
 	case SamError:
 		msg = `Login Failed: Can't log in to sam.skhu.ac.kr, Check ID and PW again.
 			로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
