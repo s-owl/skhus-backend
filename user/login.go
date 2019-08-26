@@ -108,6 +108,9 @@ func loginOnForest(ctx context.Context, loginData *LoginData,
 		go func() {
 			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
+				if len(targets) == 0 {
+					return
+				}
 				currentURL := targets[0].URL
 				fmt.Println("Page URL", currentURL)
 				switch currentURL {
@@ -170,6 +173,9 @@ func loginOnSam(ctx context.Context, loginData *LoginData,
 		go func() {
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
 				targets, _ := chromedp.Targets(ctx)
+				if len(targets) == 0 {
+					return
+				}
 				currentURL := targets[0].URL
 				fmt.Println("Page URL", currentURL)
 				switch {
