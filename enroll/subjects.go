@@ -13,6 +13,7 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/gin-gonic/gin"
+	"github.com/s-owl/skhus-backend/browser"
 	"github.com/s-owl/skhus-backend/consts"
 	"github.com/s-owl/skhus-backend/tools"
 )
@@ -50,16 +51,8 @@ func GetSubjectsWithOptions(c *gin.Context) {
 		return
 	}
 
-	// Options for custom user agent
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.UserAgent(consts.UserAgentIE),
-		// chromedp.Flag("headless", false),
-	)
-
-	// Create contexts
-	allocCtx, cancelAllocCtx := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancelAllocCtx()
-	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	Browser := browser.GetBrowser()
+	ctx, cancelCtx := Browser.NewContext()
 	defer cancelCtx()
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
