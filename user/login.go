@@ -229,7 +229,7 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 
 								loginResult.Credentials["credential-new"] = result
 								if tokenOK {
-									loginResult.Credentials["credential-new-token"] = result
+									loginResult.Credentials["credential-new-token"] = tmpToken
 								}
 								return nil
 							}),
