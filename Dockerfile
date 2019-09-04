@@ -1,5 +1,5 @@
 # build stage
-FROM golang:1.13rc1-buster AS build
+FROM golang:1.13-buster AS build
 
 RUN mkdir /build
 COPY ./ /build
