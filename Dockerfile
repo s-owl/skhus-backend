@@ -7,7 +7,7 @@ WORKDIR /build
 RUN go build -o skhus-backend .
 
 # product stage
-FROM chromedp/headless-shell:77.0.3865.42
+FROM chromedp/headless-shell:78.0.3902.4
 
 RUN mkdir /app
 WORKDIR /app
