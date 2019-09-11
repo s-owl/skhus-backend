@@ -1,0 +1,30 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+    - master
+    - develop
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Docker 이미지 빌드
+      env:
+        TAG: docker.pkg.github.com/s-owl/skhus-backend/backend:$(GITHUB_REF)-$(GITHUB_SHA)
+      run: docker build . --file Dockerfile --tag $TAG
+
+    - name: Docker 레지스트리에 로그인
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: docker login docker.pkg.github.com --username s-owl -p $GITHUB_TOKEN
+
+    - name: 레지스트리에 이미지 업로드
+      env:
+        TAG: docker.pkg.github.com/s-owl/skhus-backend/backend:$(GITHUB_REF)-$(GITHUB_SHA)
+      run: docker push $TAG
