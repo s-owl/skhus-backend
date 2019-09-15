@@ -22,6 +22,8 @@ func SetupRoutes(router *gin.Engine) {
 			tools.CredentialOldCheckMiddleware(), user.GetCurrentAttendance)
 		userRoutes.POST("/attendance",
 			tools.CredentialOldCheckMiddleware(), user.GetAttendanceWithOptions)
+		userRoutes.GET("/classinfo",
+			tools.CredentialOldCheckMiddleware(), user.GetClassInfo)
 	}
 
 	enrollRoutes := router.Group("/enroll")
