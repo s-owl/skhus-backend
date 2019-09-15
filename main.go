@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/pprof"
 )
 
 func main() {
@@ -15,5 +16,6 @@ func main() {
 	})
 
 	SetupRoutes(router)
+	pprof.Register(router)
 	router.Run()
 }
