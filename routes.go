@@ -22,6 +22,7 @@ func SetupRoutes(router *gin.Engine) {
 			tools.CredentialOldCheckMiddleware(), user.GetCurrentAttendance)
 		userRoutes.POST("/attendance",
 			tools.CredentialOldCheckMiddleware(), user.GetAttendanceWithOptions)
+		userRoutes.GET("/otp", user.GetOtpCode)
 	}
 
 	enrollRoutes := router.Group("/enroll")
