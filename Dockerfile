@@ -9,6 +9,8 @@ RUN go build -o skhus-backend .
 # product stage
 FROM chromedp/headless-shell:77.0.3865.42
 
+RUN apt-get update && \
+    apt-get install -y dumb-init
 RUN mkdir /app
 WORKDIR /app
 COPY --from=build /build/skhus-backend .
@@ -16,4 +18,5 @@ COPY --from=build /build/skhus-backend .
 ENV PATH=$PATH:/headless-shell
 
 EXPOSE 8080
-ENTRYPOINT ["./skhus-backend"]
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["./skhus-backend"]
