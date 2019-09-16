@@ -22,6 +22,8 @@ func SetupRoutes(router *gin.Engine) {
 			tools.CredentialOldCheckMiddleware(), user.GetCurrentAttendance)
 		userRoutes.POST("/attendance",
 			tools.CredentialOldCheckMiddleware(), user.GetAttendanceWithOptions)
+		userRoutes.GET("/otp",
+			tools.CredentialOldCheckMiddleware(), user.GetOtpCode)
 		userRoutes.GET("/profile",
 			tools.CredentialOldCheckMiddleware(), user.GetUserProfile)
 	}
