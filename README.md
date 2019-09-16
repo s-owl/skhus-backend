@@ -1,4 +1,7 @@
 # skhus-backend
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/41514677725048c58b8a2ec79671e936)](https://app.codacy.com/app/s-owl/skhus-backend?utm_source=github.com&utm_medium=referral&utm_content=s-owl/skhus-backend&utm_campaign=Badge_Grade_Settings)
+
 SKHU's Backend Written in Go  
 Go 언어로 다시 작성한 SKHU's 백엔드
 
