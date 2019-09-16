@@ -1,6 +1,6 @@
 package consts
 
-const ForestURL string = "http://forest.skhu.ac.kr"
+const ForestURL string = "https://forest.skhu.ac.kr"
 const ForestDomain string = "forest.skhu.ac.kr"
 const SkhuSamURL string = "http://sam.skhu.ac.kr"
 const SkhuCasURL string = "http://cas.skhu.ac.kr"
