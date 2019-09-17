@@ -20,6 +20,7 @@ func GetClassInfo(c *gin.Context) {
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)
+		log.Fatal(err)
 		return
 	}
 	defer res.Body.Close()
