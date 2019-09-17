@@ -21,14 +21,15 @@ func GetOtpCode(c *gin.Context) {
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)
-		log.Fatal(err)
+		log.Println(err)
 		return
 	}
 	defer res.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(tools.EucKrReaderToUtf8Reader(res.Body))
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	otpCode := doc.Find("span#lblOtpNum").Text()
