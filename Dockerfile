@@ -11,7 +11,6 @@ FROM chromedp/headless-shell:78.0.3902.4
 
 RUN apt-get update && \
     apt-get install -y dumb-init && ca-certificates
-    apt-get install -y ca-certificates
 RUN mkdir /app
 WORKDIR /app
 COPY --from=build /build/skhus-backend .
