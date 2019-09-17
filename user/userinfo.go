@@ -27,7 +27,8 @@ func GetUserinfo(c *gin.Context) {
 
 	doc, err := goquery.NewDocumentFromReader(tools.EucKrReaderToUtf8Reader(res.Body))
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 	e := doc.Find("span#lblInfo")
 	splited := strings.Split(e.Text(), ":")
