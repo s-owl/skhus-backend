@@ -6,8 +6,8 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -15,6 +15,7 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/gin-gonic/gin"
+	"github.com/s-owl/skhus-backend/browser"
 	"github.com/s-owl/skhus-backend/consts"
 	"github.com/s-owl/skhus-backend/tools"
 )
@@ -28,6 +29,7 @@ func GetCurrentAttendance(c *gin.Context) {
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)
+		log.Println(err)
 		return
 	}
 	defer res.Body.Close()
@@ -54,16 +56,8 @@ func GetAttendanceWithOptions(c *gin.Context) {
 		optionData.Year = strconv.Itoa(time.Now().Year())
 	}
 
-	// Options for custom user agent
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.UserAgent(consts.UserAgentIE),
-		// chromedp.Flag("headless", false)
-	)
-
-	// Create contexts
-	allocCtx, cancelAllocCtx := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancelAllocCtx()
-	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	Browser := browser.GetBrowser()
+	ctx, cancelCtx := Browser.NewContext()
 	defer cancelCtx()
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
@@ -117,6 +111,7 @@ func GetAttendanceWithOptions(c *gin.Context) {
 					var content string
 					chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
 					data <- content
+					close(data)
 				}
 			}
 		}(dataLoaded)
@@ -136,7 +131,7 @@ func GetAttendanceWithOptions(c *gin.Context) {
 func extractData(body io.Reader) map[string]interface{} {
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	attendanceData := []gin.H{}
 	doc.Find("#gvList > tbody > tr").Each(func(i int, item *goquery.Selection) {
