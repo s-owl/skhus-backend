@@ -29,6 +29,7 @@ func GetCurrentAttendance(c *gin.Context) {
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)
+		log.Println(err)
 		return
 	}
 	defer res.Body.Close()
@@ -130,7 +131,7 @@ func GetAttendanceWithOptions(c *gin.Context) {
 func extractData(body io.Reader) map[string]interface{} {
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	attendanceData := []gin.H{}
 	doc.Find("#gvList > tbody > tr").Each(func(i int, item *goquery.Selection) {
