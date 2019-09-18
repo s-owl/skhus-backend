@@ -137,6 +137,9 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
+			if _, ok := loginResult.Credentials["credential-old"]; ok {
+				return
+			}
 			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
 				if len(targets) == 0 {
@@ -195,6 +198,9 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 	loginResult *LoginResult) {
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
+			if _, ok := loginResult.Credentials["credential-new"]; ok {
+				return
+			}
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
 				targets, _ := chromedp.Targets(ctx)
 				if len(targets) == 0 {
