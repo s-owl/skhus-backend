@@ -65,19 +65,24 @@ func (code LoginError) Error() string {
 type LoginResult struct {
 	Credentials map[string]string
 	Err LoginError
-	errMutex *sync.Mutex
+	mutex *sync.Mutex
 	TriedForest bool
 	*sync.WaitGroup
 }
 
-// SetErr 에러를 뮤텍스를 걸은 후 쓴다.
+// setErr 에러를 뮤텍스를 걸은 후 쓴다.
 // 이미 에러가 있을 떄 덮어쓰지 못하게 한다.
-func (res *LoginResult) SetErr(err LoginError) {
-	res.errMutex.Lock()
+func (res *LoginResult) setErr(err LoginError) {
+	res.mutex.Lock()
 	if res.Err == 0 {
 		res.Err = err
 	}
-	res.errMutex.Unlock()
+	res.mutex.Unlock()
+}
+
+func (res *LoginResult) isExist(key string) bool {
+	_, ok := res.Credentials[key]
+	return ok
 }
 
 // Login 요청을 받아서 처리하는 함수
@@ -113,7 +118,7 @@ func runLogin(loginData LoginData) (map[string]string, LoginError) {
 
 	loginResult := &LoginResult {
 		Credentials: make(map[string]string),
-		errMutex: new(sync.Mutex),
+		mutex: new(sync.Mutex),
 		WaitGroup: new(sync.WaitGroup),
 	}
 
@@ -137,9 +142,6 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
-			if _, ok := loginResult.Credentials["credential-old"]; ok {
-				return
-			}
 			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
 				if len(targets) == 0 {
@@ -151,56 +153,60 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 				case loginPageURL:
 					if loginResult.TriedForest {
 						defer loginResult.Done()
-						loginResult.SetErr(ForestError)
+						loginResult.setErr(ForestError)
 						break
 					}
 				case agreementPageURL:
 					defer loginResult.Done()
-					loginResult.SetErr(ForestAgree)
+					loginResult.setErr(ForestAgree)
 					break
 				case mainPageURL:
 					log.Printf("Logged in on forest")
-					if _, ok = loginResult.Credentials["credential-old"]; !ok {
-						chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
-							cookies, err := network.GetAllCookies().Do(ctx)
-							if err != nil {
-								return err
-							}
+					go chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+						loginResult.mutex.Lock()
+						defer loginResult.mutex.Unlock()
 
-							defer loginResult.Done()
-
-							var buf bytes.Buffer
-							for _, cookie := range cookies {
-								buf.WriteString(cookie.Name + "=" + cookie.Value + ";")
-							}
-							result := buf.String()
-							log.Printf(result)
-							loginResult.Credentials["credential-old"] = result
+						if loginResult.isExist("credential-old") {
 							return nil
-						}))
-					}
+						}
+						cookies, err := network.GetAllCookies().Do(ctx)
+						if err != nil {
+							return err
+						}
+
+						defer loginResult.Done()
+
+						var buf bytes.Buffer
+						for _, cookie := range cookies {
+							buf.WriteString(cookie.Name + "=" + cookie.Value + ";")
+						}
+						result := buf.String()
+						log.Printf(result)
+						loginResult.Credentials["credential-old"] = result
+						return nil
+					}))
 				}
 			}
 		}()
 	})
 
-	chromedp.Run(ctx, chromedp.Tasks{
+	go chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(loginPageURL),
 		chromedp.WaitReady(`txtID`, chromedp.ByID),
 		chromedp.SetValue(`txtID`, loginData.Userid, chromedp.ByID),
 		chromedp.SetValue(`txtPW`, loginData.Userpw, chromedp.ByID),
 		chromedp.SendKeys(`txtPW`, kb.Enter, chromedp.ByID),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			loginResult.TriedForest = true
+			return nil
+		}),
 	})
-	loginResult.TriedForest = true
 }
 
 func loginOnSam(ctx context.Context, loginData LoginData,
 	loginResult *LoginResult) {
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
-			if _, ok := loginResult.Credentials["credential-new"]; ok {
-				return
-			}
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
 				targets, _ := chromedp.Targets(ctx)
 				if len(targets) == 0 {
@@ -211,7 +217,7 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 				switch {
 				case strings.HasPrefix(currentURL, consts.SkhuCasURL):
 					log.Printf("Logging in on Sam...")
-					chromedp.Run(ctx, chromedp.Tasks{
+					go chromedp.Run(ctx, chromedp.Tasks{
 						chromedp.SendKeys(`#login-username`, loginData.Userid),
 						chromedp.SendKeys(`#login-password`, loginData.Userpw),
 						chromedp.SendKeys(`login-password`, kb.Enter, chromedp.ByID),
@@ -221,9 +227,14 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 					if _, ok := loginResult.Credentials["credential-new"]; !ok {
 						var tmpToken string
 						var tokenOK bool
-						chromedp.Run(ctx, chromedp.Tasks{
+						go chromedp.Run(ctx, chromedp.Tasks{
 							chromedp.AttributeValue(`body`, `ncg-request-verification-token`, &tmpToken, &tokenOK, chromedp.ByQuery),
 							chromedp.ActionFunc(func(ctx context.Context) error {
+								loginResult.mutex.Lock()
+								defer loginResult.mutex.Unlock()
+								if loginResult.isExist("credential-new") {
+									return nil
+								}
 								cookies, err := network.GetAllCookies().Do(ctx)
 								if err != nil {
 									return err
@@ -238,7 +249,6 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 								result := buf.String()
 								log.Printf(result)
 
-
 								loginResult.Credentials["credential-new"] = result
 								if tokenOK {
 									loginResult.Credentials["credential-new-token"] = tmpToken
@@ -251,13 +261,13 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 			} else if ev, ok := ev.(*dom.EventAttributeModified); ok {
 				if ev.Name == "class" && ev.Value == "ng-scope modal-open" {
 					defer loginResult.Done()
-					loginResult.SetErr(SamError)
+					loginResult.setErr(SamError)
 					return
 				}
 			}
 		}()
 	})
-	chromedp.Run(ctx, chromedp.Tasks{
+	go chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.SkhuSamURL),
 	})
 }
