@@ -1,7 +1,9 @@
 package user
 
 import (
+	"encoding/base64"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -31,9 +33,24 @@ func GetUserProfile(c *gin.Context) {
 		return
 	}
 	imgURL := consts.ForestURL + doc.Find("img#imgSajin").AttrOr("src", "")
+	imageData := "data:image/jpeg;base64,"
 	if imgURL == consts.ForestURL {
-		imgURL = ""
+		imageData = ""
+	} else {
+
+		client := &http.Client{}
+		req, _ := http.NewRequest("GET", imgURL, nil)
+		req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
+		res, err := client.Do(req)
+		if err != nil {
+			c.String(http.StatusInternalServerError, consts.InternalError)
+			return
+		}
+		defer res.Body.Close()
+		bytes, _ := ioutil.ReadAll(res.Body)
+		imageData += base64.StdEncoding.EncodeToString(bytes)
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"name":       doc.Find("span#lblNm").Text(),
 		"id":         doc.Find("span#lblHagbeon").Text(),
@@ -44,6 +61,6 @@ func GetUserProfile(c *gin.Context) {
 		"classtype":  doc.Find("span#lblJuyaGbNm").Text(),
 		"coursetype": doc.Find("span#lblGwajeongGbNm").Text(),
 		"state":      doc.Find("span#lblHagjeogStGbNm").Text(),
-		"image":      imgURL,
+		"image":      imageData,
 	})
 }
