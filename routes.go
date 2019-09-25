@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
+
 	"github.com/s-owl/skhus-backend/enroll"
 	"github.com/s-owl/skhus-backend/grade"
 	"github.com/s-owl/skhus-backend/life"
@@ -10,7 +12,15 @@ import (
 	"github.com/s-owl/skhus-backend/user"
 )
 
+
 func SetupRoutes(router *gin.Engine) {
+	// 외부에서 사용하게 만드는 cors 설정, 필용한 곳에만!
+	accessOther := cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST"},
+		AllowHeaders:     []string{"Origin"},
+		AllowCredentials: true,
+	})
 	userRoutes := router.Group("/user")
 	{
 		userRoutes.POST("/login", user.Login)
@@ -56,6 +66,7 @@ func SetupRoutes(router *gin.Engine) {
 		lifeRoutes.POST("schedules", life.GetSchedulesWithOptions)
 		mealGroup := lifeRoutes.Group("meal")
 		{
+			mealGroup.Use(accessOther)
 			mealGroup.GET("urls", life.GetMealURLs)
 			mealGroup.POST("data", life.GetMealData)
 		}

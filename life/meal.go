@@ -12,11 +12,6 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
-func accessOther(c *gin.Context) {
-	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Origin")
-	c.Header("Acesss-Control-Allow-Origin", "*")
-}
-
 func GetMealURLs(c *gin.Context) {
 	targetURL := fmt.Sprintf("%s/uni_zelkova/uni_zelkova_4_3_list.aspx", consts.SkhuURL)
 
@@ -38,7 +33,6 @@ func GetMealURLs(c *gin.Context) {
 			"date":  item.Children().Eq(3).Text(),
 		})
 	})
-	accessOther(c)
 	c.JSON(http.StatusOK, gin.H{
 		"urls": mealUrls,
 	})
@@ -102,7 +96,6 @@ func GetMealData(c *gin.Context) {
 			},
 		})
 	}
-	accessOther(c)
 	c.JSON(http.StatusOK, gin.H{
 		"data": meal,
 	})
