@@ -67,7 +67,6 @@ func SetupRoutes(router *gin.Engine) {
 		mealGroup := lifeRoutes.Group("meal")
 		mealGroup.Use(accessOther())
 		{
-			mealGroup.Use(accessOther)
 			mealGroup.GET("urls", life.GetMealURLs)
 			mealGroup.POST("data", life.GetMealData)
 		}
