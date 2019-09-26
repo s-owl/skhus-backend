@@ -7,6 +7,7 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20190827000638-b5ac1e37ce90
 	github.com/chromedp/chromedp v0.4.0
 	github.com/gin-contrib/cors v1.3.0
+	github.com/gin-contrib/pprof v1.2.1
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.4.0
 	github.com/golang/protobuf v1.3.2 // indirect
