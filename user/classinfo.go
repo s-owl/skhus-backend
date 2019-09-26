@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gin-gonic/gin"
@@ -12,8 +11,8 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
-func GetUserinfo(c *gin.Context) {
-	targetURL := fmt.Sprintf("%s/Gate/UniTopMenu.aspx", consts.ForestURL)
+func GetClassInfo(c *gin.Context) {
+	targetURL := fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", targetURL, nil)
@@ -21,6 +20,7 @@ func GetUserinfo(c *gin.Context) {
 	res, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusInternalServerError, consts.InternalError)
+		log.Println(err)
 		return
 	}
 	defer res.Body.Close()
@@ -30,15 +30,10 @@ func GetUserinfo(c *gin.Context) {
 		log.Println(err)
 		return
 	}
-	e := doc.Find("span#lblInfo")
-	splited := strings.Split(e.Text(), ":")
-	userinfo := strings.Split(splited[1], "(")
-	name := userinfo[0]
-	id := strings.Split(userinfo[1], ")")[0]
+
 	c.JSON(http.StatusOK, gin.H{
-		"userinfo": gin.H{
-			"name": name,
-			"id":   id,
-		},
+		"counselor": doc.Find("span#lblCounselor").Text(),
+		"class":     doc.Find("span#lblBanBunBan").Text(),
+		"google":    doc.Find("span#lblGoogleClassAccount").Text(),
 	})
 }
