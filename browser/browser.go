@@ -11,7 +11,7 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-const BROWSER_TIMEOUT = 1
+const browserTimeout = 1
 
 // chromedp의 ExecAllocator를 singletone으로 관리하는 구조체(접근제어를 위해 소문자)
 type browser struct {
@@ -33,7 +33,7 @@ func (brow *browser) init() {
 		chromedp.NewExecAllocator(context.Background(), opts...)
 	//특정 시간 후에 브라우저를 닫는다
 	go func() {
-		<-time.After(BROWSER_TIMEOUT*time.Minute)
+		<-time.After(browserTimeout*time.Minute)
 		brow.reopen()
 	}()
 }
@@ -45,7 +45,7 @@ func (brow *browser) reopen() {
 	brow.init()
 }
 
-var singletone *browser = &browser{
+var singletone = &browser{
 	nil, nil, &sync.RWMutex{},
 }
 
