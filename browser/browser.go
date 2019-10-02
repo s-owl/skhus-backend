@@ -11,7 +11,7 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-const browserTimeout = 1
+const browserTimeout = 10
 
 // chromedp의 ExecAllocator를 singletone으로 관리하는 구조체(접근제어를 위해 소문자)
 type browser struct {
