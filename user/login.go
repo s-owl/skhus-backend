@@ -110,7 +110,8 @@ func runLogin(loginData LoginData) (map[string]string, LoginError) {
 	}
 
 	// Create contexts
-	Browser := browser.GetBrowser()
+	Browser := browser.NewBrowser(c)
+	defer Browser.Close()
 	forestCtx, cancelForestCtx := Browser.NewContext()
 	defer cancelForestCtx()
 	samCtx, cancelSamCtx := Browser.NewContext()
