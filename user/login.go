@@ -20,25 +20,25 @@ import (
 	"github.com/chromedp/cdproto/network"
 )
 
-// LoginData 로그인 요청 데이터
-type LoginData struct {
+// loginData 로그인 요청 데이터
+type loginData struct {
 	Userid string `form:"userid" json:"userid" xml:"userid"  binding:"required"`
 	Userpw string `form:"userpw" json:"userpw" xml:"userpw"  binding:"required"`
 }
 
-// LoginError 로그인 에러를 확인하기 위한 타입
-type LoginError uint8
+// loginError 로그인 에러를 확인하기 위한 타입
+type loginError uint8
 
 const (
 	_ = iota
-	WrongForm LoginError = iota
+	WrongForm loginError = iota
 	ForestError
 	ForestAgree
 	SamError
 )
 
 // Error 에러 메세지를 출력
-func (code LoginError) Error() string {
+func (code loginError) Error() string {
 	var msg string
 	switch code {
 	case WrongForm:
@@ -64,7 +64,7 @@ func (code LoginError) Error() string {
 // LoginResult 로그인 결과를 모으는 객체입니다.
 type LoginResult struct {
 	Credentials map[string]string
-	Err LoginError
+	Err loginError
 	mutex *sync.Mutex
 	TriedForest bool
 	*sync.WaitGroup
@@ -72,7 +72,7 @@ type LoginResult struct {
 
 // setErr 에러를 뮤텍스를 걸은 후 쓴다.
 // 이미 에러가 있을 떄 덮어쓰지 못하게 한다.
-func (res *LoginResult) setErr(err LoginError) {
+func (res *LoginResult) setErr(err loginError) {
 	res.mutex.Lock()
 	if res.Err == 0 {
 		res.Err = err
@@ -87,7 +87,7 @@ func (res *LoginResult) isExist(key string) bool {
 
 // Login 요청을 받아서 처리하는 함수
 func Login(c *gin.Context) {
-	loginData := LoginData{}
+	loginData := loginData{}
 	if err := c.ShouldBindJSON(&loginData); err != nil {
 		c.String(http.StatusBadRequest,
 			`Wrong login data form.
@@ -103,7 +103,7 @@ func Login(c *gin.Context) {
 	return
 }
 
-func runLogin(loginData LoginData) (map[string]string, LoginError) {
+func runLogin(loginData loginData) (map[string]string, loginError) {
 	// 로그인 데이터의 길이 최소 길이 검증
 	if utf8.RuneCountInString(loginData.Userid) < 1 || utf8.RuneCountInString(loginData.Userpw) < 8 {
 		return nil, WrongForm
@@ -119,8 +119,6 @@ func runLogin(loginData LoginData) (map[string]string, LoginError) {
 
 	loginResult := &LoginResult {
 		Credentials: make(map[string]string),
-		mutex: new(sync.Mutex),
-		WaitGroup: new(sync.WaitGroup),
 	}
 
 	loginResult.Add(2)
@@ -135,7 +133,7 @@ func runLogin(loginData LoginData) (map[string]string, LoginError) {
 	return loginResult.Credentials, 0
 }
 
-func loginOnForest(ctx context.Context, loginData LoginData,
+func loginOnForest(ctx context.Context, loginData loginData,
 	loginResult *LoginResult) {
 	loginPageURL := consts.ForestURL + "/Gate/UniLogin.aspx"
 	agreementPageURL := consts.ForestURL + "/Gate/CORE/P/CORP02P.aspx"
@@ -204,8 +202,14 @@ func loginOnForest(ctx context.Context, loginData LoginData,
 	})
 }
 
-func loginOnSam(ctx context.Context, loginData LoginData,
-	loginResult *LoginResult) {
+type loginSamResult struct {
+	Token      string `json: token`
+	Credential string `json: credential`
+	err        loginError
+}
+
+func loginOnSam(ctx context.Context, userData loginData) loginSamResult {
+	result := make(chan loginSamResult)
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
 			if _, ok := ev.(*page.EventFrameNavigated); ok {
@@ -219,29 +223,23 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 				case strings.HasPrefix(currentURL, consts.SkhuCasURL):
 					log.Printf("Logging in on Sam...")
 					go chromedp.Run(ctx, chromedp.Tasks{
-						chromedp.SendKeys(`#login-username`, loginData.Userid),
-						chromedp.SendKeys(`#login-password`, loginData.Userpw),
+						chromedp.SendKeys(`#login-username`, userData.Userid),
+						chromedp.SendKeys(`#login-password`, userData.Userpw),
 						chromedp.SendKeys(`login-password`, kb.Enter, chromedp.ByID),
 					})
 				case strings.HasPrefix(currentURL, consts.SkhuSamURL):
 					log.Printf("Logged in on Sam")
-					if _, ok := loginResult.Credentials["credential-new"]; !ok {
+					if result != nil {
 						var tmpToken string
 						var tokenOK bool
 						go chromedp.Run(ctx, chromedp.Tasks{
 							chromedp.AttributeValue(`body`, `ncg-request-verification-token`, &tmpToken, &tokenOK, chromedp.ByQuery),
 							chromedp.ActionFunc(func(ctx context.Context) error {
-								loginResult.mutex.Lock()
-								defer loginResult.mutex.Unlock()
-								if loginResult.isExist("credential-new") {
-									return nil
-								}
 								cookies, err := network.GetAllCookies().Do(ctx)
 								if err != nil {
 									return err
 								}
 
-								defer loginResult.Done()
 								var buf bytes.Buffer
 								for _, cookie := range cookies {
 									buf.WriteString(cookie.Name + "=" + cookie.Value + ";")
@@ -250,9 +248,11 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 								result := buf.String()
 								log.Printf(result)
 
-								loginResult.Credentials["credential-new"] = result
-								if tokenOK {
-									loginResult.Credentials["credential-new-token"] = tmpToken
+								credential := result
+								token := tmpToken
+								result <- loginSamResult {
+									Credential: credential,
+									Token: token,
 								}
 								return nil
 							}),
@@ -261,8 +261,9 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 				}
 			} else if ev, ok := ev.(*dom.EventAttributeModified); ok {
 				if ev.Name == "class" && ev.Value == "ng-scope modal-open" {
-					defer loginResult.Done()
-					loginResult.setErr(SamError)
+					result <- loginSamResult {
+						err: SamError
+					}
 					return
 				}
 			}
@@ -271,4 +272,7 @@ func loginOnSam(ctx context.Context, loginData LoginData,
 	go chromedp.Run(ctx, chromedp.Tasks{
 		chromedp.Navigate(consts.SkhuSamURL),
 	})
+	res := <-result
+	result = nil
+	return res
 }
