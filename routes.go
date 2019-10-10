@@ -25,6 +25,11 @@ func SetupRoutes(router *gin.Engine) {
 	userRoutes := router.Group("/user")
 	{
 		userRoutes.POST("/login", user.Login)
+		loginGroup := userRoutes.Group("login")
+		{
+			loginGroup.POST("forest", user.LoginForest)
+			loginGroup.POST("sam", user.LoginSam)
+		}
 		userRoutes.GET("/userinfo",
 			tools.CredentialOldCheckMiddleware(), user.GetUserinfo)
 		userRoutes.GET("/credits",
