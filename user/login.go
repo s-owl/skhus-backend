@@ -298,9 +298,9 @@ func LoginSam(c *gin.Context) {
 }
 
 type totalResult struct {
-	OldCredential      string `json:"credential"`
-	NewCredential      string `json:"new-credential"`
-	NewCredentialToken string `json:"new-credential-token"`
+	OldCredential      string `json:"credential-old"`
+	NewCredential      string `json:"credential-new"`
+	NewCredentialToken string `json:"credential-new-token"`
 }
 
 // Login 기존 로그인
