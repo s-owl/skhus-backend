@@ -56,8 +56,7 @@ func GetAttendanceWithOptions(c *gin.Context) {
 		optionData.Year = strconv.Itoa(time.Now().Year())
 	}
 
-	Browser := browser.NewBrowser(c)
-	defer Browser.Close()
+	Browser := browser.GetBrowser()
 	ctx, cancelCtx := Browser.NewContext()
 	defer cancelCtx()
 
