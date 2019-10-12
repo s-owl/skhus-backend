@@ -52,7 +52,8 @@ func GetSubjectsWithOptions(c *gin.Context) {
 		return
 	}
 
-	Browser := browser.GetBrowser()
+	Browser := browser.NewBrowser(c)
+	defer Browser.Close()
 	ctx, cancelCtx := Browser.NewContext()
 	defer cancelCtx()
 
