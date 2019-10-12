@@ -48,22 +48,18 @@ func (code loginError) Error() string {
 		msg = `ID or PW is empty. Or PW is shorter then 8 digits.
 If you are using password with less then 8 digits, please change it at forest.skhu.ac.kr
 학번 또는 비밀번호가 비어있거나 비밀번호가 8자리 미만 입니다.
-8자리 미만 비밀번호 사용 시, forest.skhu.ac.kr 에서 변경 후 사용해 주세요.
-`
+8자리 미만 비밀번호 사용 시, forest.skhu.ac.kr 에서 변경 후 사용해 주세요.`
 	case ForestError:
 		msg = `Login Failed: Can't log in on forest.skhu.ac.kr, Check ID and PW again.
-로그인 실패: forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.
-`
+로그인 실패: forest.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.`
 	case ForestAgree:
 		msg = `Login Failed: Please complete privacy policy agreement at forest.skhu.ac.kr
-로그인 실패: forest.skhu.ac.kr 에서 개인정보 제공 동의를 완료해 주세요.
-`
+로그인 실패: forest.skhu.ac.kr 에서 개인정보 제공 동의를 완료해 주세요.`
 	case SamError:
 		msg = `Login Failed: Can't log in on sam.skhu.ac.kr, Check ID and PW again.
 If your account only works on fores.skhu.ac.kr, Please contact Sungkonghoe University Electric Computing Center
 로그인 실패: sam.skhu.ac.kr 에 로그인 할 수 없습니다. 학번과 비밀번호를 다시 확인하세요.
-forest.skhu.ac.kr 에서만 정상 로그인이 가능한 경우, 성공회대학교 전자계산소에 연락하세요.
-`
+forest.skhu.ac.kr 에서만 정상 로그인이 가능한 경우, 성공회대학교 전자계산소에 연락하세요.`
 	}
 	return msg
 }
@@ -72,26 +68,21 @@ forest.skhu.ac.kr 에서만 정상 로그인이 가능한 경우, 성공회대�
 type loginData struct {
 	Userid string `form:"userid" json:"userid" xml:"userid"  binding:"required"`
 	Userpw string `form:"userpw" json:"userpw" xml:"userpw"  binding:"required"`
+	Type   string `form:"type"   json:"type"   xml:"type"`
 }
 
 // getLoginData gin에서 loginData를 추출하고 실패시 에러 출력
-func getLoginData(c *gin.Context) *loginData {
+func getLoginData(c *gin.Context) (*loginData, error) {
 	data := &loginData{}
 	// gin 컨텍스트에서 데이터 파싱
 	if err := c.ShouldBindJSON(data); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf("%s\n%s", FailedParsing.Error(), err.Error()),
-		})
-		return nil
+		return nil, fmt.Errorf("%w\n%s", FailedParsing, err.Error())
 	}
 	// 로그인 데이터의 길이 최소 길이 검증
 	if utf8.RuneCountInString(data.Userid) < 1 || utf8.RuneCountInString(data.Userpw) < 8 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf("%s", WrongForm.Error()),
-		})
-		return nil
+		return nil, WrongForm
 	}
-	return data
+	return data, nil
 }
 
 // 로그인 결과값
@@ -108,7 +99,7 @@ func response(c *gin.Context, res loginResult) {
 }
 
 type loginForestResult struct {
-	Credential string `json:"credential"`
+	Credential string `json:"credential-old"`
 	Err        string `json:"error"`
 }
 
@@ -116,7 +107,7 @@ func (res loginForestResult)getErr() string {
 	return res.Err
 }
 
-func loginOnForest(ctx context.Context, userData *loginData) loginForestResult {
+func loginOnForest(ctx context.Context, userData *loginData) chan loginForestResult {
 	loginPageURL := consts.ForestURL + "/Gate/UniLogin.aspx"
 	agreementPageURL := consts.ForestURL + "/Gate/CORE/P/CORP02P.aspx"
 	mainPageURL := consts.ForestURL + "/Gate/UniMyMain.aspx"
@@ -125,9 +116,10 @@ func loginOnForest(ctx context.Context, userData *loginData) loginForestResult {
 	loginTried := false
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
-			if result == nil {
-				return
-			} else if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
+			defer func() {
+				recover()
+			}()
+			if _, ok := ev.(*page.EventFrameStoppedLoading); ok {
 				targets, _ := chromedp.Targets(ctx)
 				if len(targets) == 0 {
 					return
@@ -140,14 +132,19 @@ func loginOnForest(ctx context.Context, userData *loginData) loginForestResult {
 						result <- loginForestResult {
 							Err: ForestError.Error(),
 						}
+						close(result)
 					}
 				case agreementPageURL:
 						result <- loginForestResult {
 							Err: ForestAgree.Error(),
 						}
+						close(result)
 				case mainPageURL:
 					log.Printf("Logged in on forest")
 					go chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+						defer func() {
+							recover()
+						}()
 						cookies, err := network.GetAllCookies().Do(ctx)
 						if err != nil {
 							return err
@@ -162,6 +159,7 @@ func loginOnForest(ctx context.Context, userData *loginData) loginForestResult {
 						result <- loginForestResult {
 							Credential: credential,
 						}
+						close(result)
 						return nil
 					}))
 				}
@@ -181,30 +179,12 @@ func loginOnForest(ctx context.Context, userData *loginData) loginForestResult {
 		}),
 	})
 
-	res := <-result
-	result = nil
-	return res
-}
-
-// LoginForest 포레스트 로그인
-func LoginForest(c *gin.Context) {
-	userData := getLoginData(c)
-	if userData == nil {
-		return
-	}
-
-	// browser 초기화
-	Browser := browser.NewBrowser(c)
-	defer Browser.Close()
-	tab, cf := Browser.NewContext()
-	defer cf()
-	// 결과 전송
-	response(c, loginOnForest(tab, userData))
+	return result
 }
 
 type loginSamResult struct {
-	Credential string `json:"credential"`
-	Token      string `json:"token"`
+	Credential string `json:"credential-new"`
+	Token      string `json:"credential-new-token"`
 	Err        string `json:"error"`
 }
 
@@ -212,13 +192,14 @@ func (res loginSamResult)getErr() string {
 	return res.Err
 }
 
-func loginOnSam(ctx context.Context, userData *loginData) loginSamResult {
+func loginOnSam(ctx context.Context, userData *loginData) chan loginSamResult {
 	result := make(chan loginSamResult)
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func() {
-			if result == nil {
-				return
-			} else if _, ok := ev.(*page.EventFrameNavigated); ok {
+			defer func() {
+				recover()
+			}()
+			if _, ok := ev.(*page.EventFrameNavigated); ok {
 				targets, _ := chromedp.Targets(ctx)
 				if len(targets) == 0 {
 					return
@@ -240,6 +221,9 @@ func loginOnSam(ctx context.Context, userData *loginData) loginSamResult {
 					go chromedp.Run(ctx, chromedp.Tasks{
 						chromedp.AttributeValue(`body`, `ncg-request-verification-token`, &tmpToken, &tokenOK, chromedp.ByQuery),
 						chromedp.ActionFunc(func(ctx context.Context) error {
+							defer func() {
+								recover()
+							}()
 							cookies, err := network.GetAllCookies().Do(ctx)
 							if err != nil {
 								return err
@@ -258,6 +242,7 @@ func loginOnSam(ctx context.Context, userData *loginData) loginSamResult {
 								Credential: credential,
 								Token: token,
 							}
+							close(result)
 							return nil
 						}),
 					})
@@ -267,6 +252,7 @@ func loginOnSam(ctx context.Context, userData *loginData) loginSamResult {
 					result <- loginSamResult {
 						Err: SamError.Error(),
 					}
+					close(result)
 					return
 				}
 			}
@@ -276,25 +262,7 @@ func loginOnSam(ctx context.Context, userData *loginData) loginSamResult {
 		chromedp.Navigate(consts.SkhuSamURL),
 	})
 
-	res := <-result
-	result = nil
-	return res
-}
-
-// LoginSam Sam 로그인
-func LoginSam(c *gin.Context) {
-	userData := getLoginData(c)
-	if userData == nil {
-		return
-	}
-
-	// Browser 초기화
-	Browser := browser.NewBrowser(c)
-	defer Browser.Close()
-	tab, cf := Browser.NewContext()
-	defer cf()
-	// 결과 전송
-	response(c, loginOnSam(tab, userData))
+	return result
 }
 
 type totalResult struct {
@@ -305,52 +273,57 @@ type totalResult struct {
 
 // Login 기존 로그인
 func Login(c *gin.Context) {
-	userData := &loginData{}
-	// gin 컨텍스트에서 데이터 파싱
-	if err := c.ShouldBindJSON(userData); err != nil {
-		c.String(http.StatusBadRequest, fmt.Sprintf("%s\n%s", FailedParsing.Error(), err.Error()))
-		return
-	}
-	// 로그인 데이터의 길이 최소 길이 검증
-	if utf8.RuneCountInString(userData.Userid) < 1 || utf8.RuneCountInString(userData.Userpw) < 8 {
-		c.String(http.StatusBadRequest, fmt.Sprintf("%s", WrongForm.Error()))
-		return
+	userData, err := getLoginData(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H {
+			"error": err.Error(),
+		})
 	}
 
 	// Browser 초기화
 	Browser := browser.NewBrowser(c)
 	defer Browser.Close()
 
-	// 동시 처리를 위한 채널 초기화
-	forestResult := make(chan loginForestResult)
-	samResult := make(chan loginSamResult)
-	// 동시 시작
-	go func() {
-		tab, cf := Browser.NewContext()
-		defer cf()
-		forestResult <- loginOnForest(tab, userData)
-	}()
-	go func() {
-		tab, cf := Browser.NewContext()
-		defer cf()
-		samResult <- loginOnSam(tab, userData)
-	}()
+	// 로그인 결과를 담기 위한 변수
+	var res loginResult
 
-	// 결과 확인
-	forest := <-forestResult
-	sam := <-samResult
-	// error 메세지 우선 순위는 forest가 우선
-	if forest.Err != "" || sam.Err != "" {
-		if forest.Err == "" {
-			c.String(http.StatusUnauthorized, sam.Err)
+	switch userData.Type {
+	case "":
+		forestTab, fcf := Browser.NewContext()
+		defer fcf()
+		samTab, scf := Browser.NewContext()
+		defer scf()
+
+		// 로그인 시작
+		forestResult := loginOnForest(forestTab, userData)
+		samResult := loginOnSam(samTab, userData)
+
+		// 결과 확인
+		forest := <-forestResult
+		sam := <-samResult
+		// error 메세지 우선 순위는 forest가 우선
+		if forest.Err != "" || sam.Err != "" {
+			if forest.Err == "" {
+				c.String(http.StatusUnauthorized, sam.Err)
+			} else {
+				c.String(http.StatusUnauthorized, forest.Err)
+			}
 		} else {
-			c.String(http.StatusUnauthorized, forest.Err)
+			c.JSON(http.StatusOK, totalResult{
+				forest.Credential,
+				sam.Credential,
+				sam.Token,
+			})
 		}
 		return
+	case "credential-old":
+		forestTab, cf := Browser.NewContext()
+		defer cf()
+		res = <-loginOnForest(forestTab, userData)
+	case "credential-new":
+		samTab, cf := Browser.NewContext()
+		defer cf()
+		res = <-loginOnSam(samTab, userData)
 	}
-	c.JSON(http.StatusOK, totalResult{
-		forest.Credential,
-		sam.Credential,
-		sam.Token,
-	})
+	response(c, res)
 }
