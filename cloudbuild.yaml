@@ -11,5 +11,3 @@ steps:
     '--concurrency=1',
     '--platform', 'managed',
     '--allow-unauthenticated']
-images:
-  - 'asia.gcr.io/$PROJECT_ID/skhus-backend'
