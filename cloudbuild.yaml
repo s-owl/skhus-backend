@@ -1,11 +1,11 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'asia.gcr.io/$PROJECT_ID/skhus-backend:$TAG_NAME', '.']
+    args: ['build', '-t', 'asia.gcr.io/$PROJECT_ID/skhus-backend:$BRANCH_NAME', '.']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia.gcr.io/$PROJECT_ID/skhus-backend:$TAG_NAME']
+    args: ['push', 'asia.gcr.io/$PROJECT_ID/skhus-backend:$BRANCH_NAME']
   - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['beta', 'run', 'deploy', 'skhus-backend-$TAG_NAME',
-    '--image', 'asia.gcr.io/$PROJECT_ID/skhus-backend:$TAG_NAME',
+    args: ['beta', 'run', 'deploy', 'skhus-backend-$BRANCH_NAME',
+    '--image', 'asia.gcr.io/$PROJECT_ID/skhus-backend:$BRANCH_NAME',
     '--region', 'asia-northeast1',
     '--memory', '512Mi',
     '--concurrency=1',
