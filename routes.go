@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/pprof"
 
 	"github.com/s-owl/skhus-backend/enroll"
 	"github.com/s-owl/skhus-backend/grade"
@@ -71,11 +70,5 @@ func SetupRoutes(router *gin.Engine) {
 			mealGroup.GET("urls", life.GetMealURLs)
 			mealGroup.POST("data", life.GetMealData)
 		}
-	}
-	debugRoutes := router.Group("debug")
-	{
-		debugRoutes.GET("process", GetProcessInfo)
-		// pprof가 gin.Engine 타입을 요구해서 대신 라우터를 준다. debug/pprof에 위치한다.
-		pprof.Register(router)
 	}
 }
