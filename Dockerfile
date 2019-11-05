@@ -7,11 +7,14 @@ WORKDIR /build
 RUN go build -o skhus-backend .
 
 # product stage
-FROM chromedp/headless-shell:78.0.3902.4
+FROM chromedp/headless-shell:79.0.3945.16
 
 RUN apt-get update && \
-    apt-get install -y dumb-init ca-certificates procps
-RUN mkdir /app
+    apt-get install -y dumb-init ca-certificates procps && \
+    apt-get autoclean -y && apt-get clean -y && \
+    apt-get autoremove -y && rm -rf /var/lib/{apt,dpkg,cache,log} && \
+    mkdir /app
+    
 WORKDIR /app
 COPY --from=build /build/skhus-backend .
 
