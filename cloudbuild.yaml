@@ -9,5 +9,6 @@ steps:
     '--region', 'asia-northeast1',
     '--memory', '1024Mi',
     '--concurrency=2',
+    '--timeout=30s',
     '--platform', 'managed',
     '--allow-unauthenticated']
