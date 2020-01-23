@@ -1,23 +1,23 @@
 package user
 
 import (
-	"fmt"
-	"log"
 	"bytes"
 	"context"
-	"strings"
+	"fmt"
+	"log"
 	"net/http"
+	"strings"
 	"unicode/utf8"
 
-	"github.com/s-owl/skhus-backend/consts"
 	"github.com/s-owl/skhus-backend/browser"
+	"github.com/s-owl/skhus-backend/consts"
 
-	"github.com/gin-gonic/gin"
+	"github.com/chromedp/cdproto/dom"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
-	"github.com/chromedp/cdproto/dom"
-	"github.com/chromedp/cdproto/page"
-	"github.com/chromedp/cdproto/network"
+	"github.com/gin-gonic/gin"
 )
 
 // loginError 로그인 에러를 확인하기 위한 타입
@@ -88,6 +88,7 @@ func getLoginData(c *gin.Context) (*loginData, error) {
 // 로그인 결과값
 type loginResult interface {
 	getErr() string
+	getCookie() map[string]string
 }
 
 func response(c *gin.Context, res loginResult) {
@@ -95,16 +96,35 @@ func response(c *gin.Context, res loginResult) {
 	if res.getErr() != "" {
 		code = http.StatusUnauthorized
 	}
+
+	// 헤더에 쿠키 삽입
+	for k, v := range res.getCookie() {
+		// Cookie-Time 90 minute * 60 second = 5400
+		http.SetCookie(c.Writer, &http.Cookie{
+			Name:     k,
+			Value:    v,
+			Path:     "/",
+			MaxAge:   5400,
+			Secure:   false,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+	}
 	c.JSON(code, res)
 }
 
 type loginForestResult struct {
 	Credential string `json:"credential-old"`
 	Err        string `json:"error"`
+	cookie     map[string]string
 }
 
-func (res loginForestResult)getErr() string {
+func (res loginForestResult) getErr() string {
 	return res.Err
+}
+
+func (res loginForestResult) getCookie() map[string]string {
+	return res.cookie
 }
 
 func loginOnForest(ctx context.Context, userData *loginData) chan loginForestResult {
@@ -129,16 +149,16 @@ func loginOnForest(ctx context.Context, userData *loginData) chan loginForestRes
 				switch currentURL {
 				case loginPageURL:
 					if loginTried {
-						result <- loginForestResult {
+						result <- loginForestResult{
 							Err: ForestError.Error(),
 						}
 						close(result)
 					}
 				case agreementPageURL:
-						result <- loginForestResult {
-							Err: ForestAgree.Error(),
-						}
-						close(result)
+					result <- loginForestResult{
+						Err: ForestAgree.Error(),
+					}
+					close(result)
 				case mainPageURL:
 					log.Printf("Logged in on forest")
 					go chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
@@ -150,15 +170,19 @@ func loginOnForest(ctx context.Context, userData *loginData) chan loginForestRes
 							return err
 						}
 
+						data := loginForestResult{
+							Credential: "",
+							cookie:     make(map[string]string),
+						}
+
 						var buf bytes.Buffer
 						for _, cookie := range cookies {
 							buf.WriteString(cookie.Name + "=" + cookie.Value + ";")
+							data.cookie[cookie.Name] = cookie.Value
 						}
-						credential := buf.String()
-						log.Printf(credential)
-						result <- loginForestResult {
-							Credential: credential,
-						}
+						data.Credential = buf.String()
+						log.Printf(data.Credential)
+						result <- data
 						close(result)
 						return nil
 					}))
@@ -186,10 +210,15 @@ type loginSamResult struct {
 	Credential string `json:"credential-new"`
 	Token      string `json:"credential-new-token"`
 	Err        string `json:"error"`
+	cookie     map[string]string
 }
 
-func (res loginSamResult)getErr() string {
+func (res loginSamResult) getErr() string {
 	return res.Err
+}
+
+func (res loginSamResult) getCookie() map[string]string {
+	return res.cookie
 }
 
 func loginOnSam(ctx context.Context, userData *loginData) chan loginSamResult {
@@ -229,19 +258,23 @@ func loginOnSam(ctx context.Context, userData *loginData) chan loginSamResult {
 								return err
 							}
 
+							data := loginSamResult{
+								Credential: "",
+								Token:      "",
+								cookie:     make(map[string]string),
+							}
+
 							var buf bytes.Buffer
 							for _, cookie := range cookies {
 								buf.WriteString(cookie.Name + "=" + cookie.Value + ";")
+								data.cookie[cookie.Name] = cookie.Value
 							}
 
-							credential := buf.String()
-							log.Printf(credential)
+							data.Credential = buf.String()
+							log.Printf(data.Credential)
 
-							token := tmpToken
-							result <- loginSamResult {
-								Credential: credential,
-								Token: token,
-							}
+							data.Token = tmpToken
+							result <- data
 							close(result)
 							return nil
 						}),
@@ -249,7 +282,7 @@ func loginOnSam(ctx context.Context, userData *loginData) chan loginSamResult {
 				}
 			} else if ev, ok := ev.(*dom.EventAttributeModified); ok {
 				if ev.Name == "class" && ev.Value == "ng-scope modal-open" {
-					result <- loginSamResult {
+					result <- loginSamResult{
 						Err: SamError.Error(),
 					}
 					close(result)
@@ -275,7 +308,7 @@ type totalResult struct {
 func Login(c *gin.Context) {
 	userData, err := getLoginData(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H {
+		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 	}
