@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 
+	"github.com/s-owl/skhus-backend/consts"
 	"github.com/s-owl/skhus-backend/enroll"
 	"github.com/s-owl/skhus-backend/grade"
 	"github.com/s-owl/skhus-backend/life"
@@ -12,16 +13,21 @@ import (
 	"github.com/s-owl/skhus-backend/user"
 )
 
-
 func SetupRoutes(router *gin.Engine) {
 	// 외부에서 사용하게 만드는 cors 설정, 필용한 곳에만!
-	accessOther := cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST"},
-		AllowHeaders:     []string{"Origin"},
-		AllowCredentials: true,
-	})
+	otherConfig := cors.DefaultConfig()
+	otherConfig.AllowAllOrigins = true
+	otherConfig.AllowHeaders = []string{"Content-Type"}
+	accessFromOther := cors.New(otherConfig)
+	// 지정한 페이지에서만 사용가능하게 설정
+	webConfig := cors.DefaultConfig()
+	webConfig.AllowOrigins = consts.SkhusWebSite()
+	webConfig.AllowCredentials = true
+	webConfig.AllowHeaders = []string{"Content-Type"}
+	accessFromWeb := cors.New(webConfig)
+
 	userRoutes := router.Group("/user")
+	userRoutes.Use(accessFromWeb)
 	{
 		userRoutes.POST("/login", user.Login)
 		userRoutes.GET("/userinfo",
@@ -41,6 +47,7 @@ func SetupRoutes(router *gin.Engine) {
 	}
 
 	enrollRoutes := router.Group("/enroll")
+	enrollRoutes.Use(accessFromWeb)
 	enrollRoutes.Use(tools.CredentialOldCheckMiddleware())
 	{
 		enrollRoutes.GET("/saved_credits", enroll.GetSavedCredits)
@@ -49,6 +56,7 @@ func SetupRoutes(router *gin.Engine) {
 	}
 
 	scholarshipRoutes := router.Group("scholarship")
+	scholarshipRoutes.Use(accessFromWeb)
 	scholarshipRoutes.Use(tools.CredentialOldCheckMiddleware())
 	{
 		scholarshipRoutes.GET("history", scholarship.GetScholarshipHistory)
@@ -56,16 +64,17 @@ func SetupRoutes(router *gin.Engine) {
 	}
 
 	gradeRoutes := router.Group("grade")
+	gradeRoutes.Use(accessFromWeb)
 	gradeRoutes.Use(tools.CredentialOldCheckMiddleware())
 	{
 		gradeRoutes.GET("certificate", grade.GetGradeCertificate)
 	}
 
 	lifeRoutes := router.Group("life")
+	lifeRoutes.Use(accessFromOther)
 	{
 		lifeRoutes.POST("schedules", life.GetSchedulesWithOptions)
 		mealGroup := lifeRoutes.Group("meal")
-		mealGroup.Use(accessOther)
 		{
 			mealGroup.GET("urls", life.GetMealURLs)
 			mealGroup.POST("data", life.GetMealData)
