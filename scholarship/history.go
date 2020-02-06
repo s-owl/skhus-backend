@@ -36,12 +36,10 @@ func GetScholarshipHistory(c *gin.Context) {
 			"year":             item.Children().Eq(0).Text(),
 			"semester":         item.Children().Eq(1).Text(),
 			"scholarship_name": item.Children().Eq(2).Text(),
-			"order":            item.Children().Eq(3).Text(),
-			"grade":            item.Children().Eq(4).Text(),
-			"amount_entrance":  item.Children().Eq(5).Text(),
-			"amount_class":     item.Children().Eq(6).Text(),
-			"benefit_type":     item.Children().Eq(7).Text(),
-			"note":             item.Children().Eq(8).Text(),
+			"amount_entrance":  item.Children().Eq(3).Text(),
+			"amount_class":     item.Children().Eq(4).Text(),
+			"benefit_type":     item.Children().Eq(5).Text(),
+			"note":             item.Children().Eq(6).Text(),
 		})
 	})
 	c.JSON(http.StatusOK, gin.H{
