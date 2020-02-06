@@ -34,8 +34,8 @@ func GetScholarshipHistory(c *gin.Context) {
 	doc.Find("table#dgList > tbody > tr").Each(func(i int, item *goquery.Selection) {
 		history = append(history, gin.H{
 			"year":             item.Children().Eq(0).Text(),
-			"scholarship_name": item.Children().Eq(1).Text(),
-			"order":            item.Children().Eq(2).Text(),
+			"semester":         item.Children().Eq(1).Text(),
+			"scholarship_name": item.Children().Eq(2).Text(),
 			"amount_entrance":  item.Children().Eq(3).Text(),
 			"amount_class":     item.Children().Eq(4).Text(),
 			"benefit_type":     item.Children().Eq(5).Text(),
