@@ -44,7 +44,7 @@ func CredentialOldCheckMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		for _, item := range []string{"ASP.NET_SessionId", ".AuthCookie", "UniCookie", "KIS"} {
+		for _, item := range []string{"ASP.NET_SessionId", ".AuthCookie", "UniCookie"} {
 			if !strings.Contains(credential, item) {
 				fmt.Println("not full cookie")
 				c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
@@ -52,7 +52,7 @@ func CredentialOldCheckMiddleware() gin.HandlerFunc {
 				return
 			}
 		}
-		if len(strings.Split(credential, ";")) != 5 {
+		if len(strings.Split(credential, ";")) < 4 {
 			fmt.Println("cookie number wrong")
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 			c.Abort()
