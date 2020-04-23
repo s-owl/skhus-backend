@@ -15,7 +15,7 @@ type Browser struct {
 	cancelCtx context.CancelFunc
 }
 
-// NewBrowser context를 받아 Browser를 초기화한다.
+// context를 받아 Browser를 초기화한다.
 func NewBrowser(ctx context.Context) *Browser {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.UserAgent(consts.UserAgentIE))
@@ -29,12 +29,12 @@ func NewBrowser(ctx context.Context) *Browser {
 	return browser
 }
 
-// NewContext 브라우저에서 tab을 사용할 수 있는 context를 생성한다.
+// 브라우저에서 tab context를 생성한다.
 func (brow *Browser)NewContext() (context.Context, context.CancelFunc) {
 	return chromedp.NewContext(brow.allocCtx, chromedp.WithLogf(log.Printf))
 }
 
-// Close Browser 객체의 context를 캔슬한다.
+// Browser 객체의 모든 context를 캔슬한다.
 func (brow *Browser)Close() {
 	brow.cancelCtx()
 }
