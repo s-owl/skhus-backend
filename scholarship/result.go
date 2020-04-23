@@ -1,7 +1,6 @@
 package scholarship
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -11,8 +10,31 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
+// 장학금 신청 결과를 조회하는 함수
+/*
+	{
+		"userinfo": {
+			"year":     "...",
+			"semester": "...",
+			"date":     "...",
+			"type":     "...",
+			"reason":   "...",
+			"result":   "...",
+		},
+		"apply_result": [
+			{
+				"year":     "...",
+				"semester": "...",
+				"date":     "...",
+				"type":     "...",
+				"reason":   "...",
+				"result":   "...",
+			}
+		]
+	}
+*/
 func GetScholarshipResults(c *gin.Context) {
-	targetURL := fmt.Sprintf("%s/GATE/SAM/SCHOLARSHIP/S/SJHS06S.ASPX?&maincd=O&systemcd=S&seq=1", consts.ForestURL)
+	targetURL := consts.ForestURL + "/GATE/SAM/SCHOLARSHIP/S/SJHS06S.ASPX?&maincd=O&systemcd=S&seq=1"
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", targetURL, nil)
 	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))
