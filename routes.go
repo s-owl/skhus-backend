@@ -13,6 +13,7 @@ import (
 	"github.com/s-owl/skhus-backend/user"
 )
 
+// 전체적인 타우팅을 여기에서 구성한다.
 func SetupRoutes(router *gin.Engine) {
 	// 외부에서 사용하게 만드는 cors 설정, 필용한 곳에만!
 	otherConfig := cors.DefaultConfig()
@@ -27,6 +28,7 @@ func SetupRoutes(router *gin.Engine) {
 	accessFromWeb := cors.New(webConfig)
 
 	userRoutes := router.Group("/user")
+	// 학생과 관련된 정보를 받아오는 API
 	userRoutes.Use(accessFromWeb)
 	{
 		userRoutes.POST("/login", user.Login)
@@ -55,6 +57,7 @@ func SetupRoutes(router *gin.Engine) {
 		enrollRoutes.POST("/subjects", enroll.GetSubjectsWithOptions)
 	}
 
+	// 장학에 관련된 정보를 가져오는 API
 	scholarshipRoutes := router.Group("scholarship")
 	scholarshipRoutes.Use(accessFromWeb)
 	scholarshipRoutes.Use(tools.CredentialOldCheckMiddleware())
@@ -63,6 +66,7 @@ func SetupRoutes(router *gin.Engine) {
 		scholarshipRoutes.GET("result", scholarship.GetScholarshipResults)
 	}
 
+	// 학점에 대한 정보를 가져오는 API
 	gradeRoutes := router.Group("grade")
 	gradeRoutes.Use(accessFromWeb)
 	gradeRoutes.Use(tools.CredentialOldCheckMiddleware())
@@ -70,6 +74,7 @@ func SetupRoutes(router *gin.Engine) {
 		gradeRoutes.GET("certificate", grade.GetGradeCertificate)
 	}
 
+	// 학교 생활(일정, 학식)에 대한 정보를 가져오는 API
 	lifeRoutes := router.Group("life")
 	lifeRoutes.Use(accessFromOther)
 	{
