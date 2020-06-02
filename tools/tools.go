@@ -4,9 +4,9 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
-	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/s-owl/skhus-backend/consts"
@@ -39,28 +39,28 @@ func CredentialOldCheckMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		credential := c.GetHeader("Credential")
 		if credential == "" {
-			fmt.Println("empty credential")
+			log.Println("empty credential")
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 			c.Abort()
 			return
 		}
 		for _, item := range []string{"ASP.NET_SessionId", ".AuthCookie", "UniCookie"} {
 			if !strings.Contains(credential, item) {
-				fmt.Println("not full cookie")
+				log.Println("not full cookie")
 				c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 				c.Abort()
 				return
 			}
 		}
 		if len(strings.Split(credential, ";")) < 4 {
-			fmt.Println("cookie number wrong")
+			log.Println("cookie number wrong")
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 			c.Abort()
 			return
 		}
 		cookies, err := ConvertToCookies(credential)
 		if err != nil {
-			fmt.Println("Wrong Cookie")
+			log.Println("Wrong Cookie")
 			c.String(http.StatusBadRequest, consts.CredentialMalformedMsg)
 			c.Abort()
 			return

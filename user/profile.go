@@ -2,7 +2,6 @@ package user
 
 import (
 	"encoding/base64"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -14,7 +13,7 @@ import (
 )
 
 func GetUserProfile(c *gin.Context) {
-	targetURL := fmt.Sprintf("%s/GATE/SAM/SERVICE/S/SWSS01P.ASPX?&maincd=O&systemcd=S&seq=1", consts.ForestURL)
+	targetURL := consts.ForestURL + "/GATE/SAM/SERVICE/S/SWSS01P.ASPX?&maincd=O&systemcd=S&seq=1"
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", targetURL, nil)

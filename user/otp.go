@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -13,7 +12,7 @@ import (
 )
 
 func GetOtpCode(c *gin.Context) {
-	targetURL := fmt.Sprintf("%s/Gate/Utility/A/UTLA01P.aspx?&maincd=O&systemcd=S&seq=0", consts.ForestURL)
+	targetURL := consts.ForestURL + "/Gate/Utility/A/UTLA01P.aspx?&maincd=O&systemcd=S&seq=0"
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", targetURL, nil)

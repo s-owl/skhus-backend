@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -13,7 +12,7 @@ import (
 )
 
 func GetMyCredits(c *gin.Context) {
-	targetURL := fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
+	targetURL := consts.ForestURL + "/Gate/UniMainStudent.aspx"
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", targetURL, nil)

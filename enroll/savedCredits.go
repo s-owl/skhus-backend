@@ -1,7 +1,6 @@
 package enroll
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -13,7 +12,7 @@ import (
 )
 
 func GetSavedCredits(c *gin.Context) {
-	targetURL := fmt.Sprintf("%s/Gate/SAM/Lecture/H/SSGH03S.aspx?&maincd=O&systemcd=S&seq=100", consts.ForestURL)
+	targetURL := consts.ForestURL + "/Gate/SAM/Lecture/H/SSGH03S.aspx?&maincd=O&systemcd=S&seq=100"
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", targetURL, nil)
 	req.Header.Add("Cookie", c.MustGet("CredentialOld").(string))

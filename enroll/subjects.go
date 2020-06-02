@@ -2,7 +2,6 @@ package enroll
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -18,7 +17,7 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
-var targetURL = fmt.Sprintf("%s/GATE/SAM/LECTURE/S/SSGS09S.ASPX?maincd=O&systemcd=S&seq=1", consts.ForestURL)
+var targetURL = consts.ForestURL + "/GATE/SAM/LECTURE/S/SSGS09S.ASPX?maincd=O&systemcd=S&seq=1"
 
 func GetSubjects(c *gin.Context) {
 	client := &http.Client{}
@@ -63,7 +62,7 @@ func GetSubjectsWithOptions(c *gin.Context) {
 				targets, _ := chromedp.Targets(ctx)
 				if len(targets) > 0 {
 					currentURL := targets[0].URL
-					fmt.Println("Page URL", currentURL)
+					log.Println("Page URL", currentURL)
 				}
 			}
 		}()
@@ -79,9 +78,9 @@ func GetSubjectsWithOptions(c *gin.Context) {
 				cookieParam.URL = targetURL
 				ok, err := cookieParam.Do(context)
 				if ok {
-					fmt.Println("Cookie Set")
+					log.Println("Cookie Set")
 				} else if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 				}
 			}
 

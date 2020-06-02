@@ -13,7 +13,7 @@ import (
 )
 
 func GetMealURLs(c *gin.Context) {
-	targetURL := fmt.Sprintf("%s/uni_zelkova/uni_zelkova_4_3_list.aspx", consts.SkhuURL)
+	targetURL := consts.SkhuURL + "/uni_zelkova/uni_zelkova_4_3_list.aspx"
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", targetURL, nil)
@@ -29,7 +29,7 @@ func GetMealURLs(c *gin.Context) {
 	doc.Find("table.board_list > tbody > tr").Each(func(i int, item *goquery.Selection) {
 		mealUrls = append(mealUrls, gin.H{
 			"title": item.Children().Eq(1).Find("a").Text(),
-			"url":   fmt.Sprintf("%s/uni_zelkova/%s", consts.SkhuURL, item.Children().Eq(1).Find("a").AttrOr("href", "")),
+			"url":   consts.SkhuURL + "/uni_zelkova/" + item.Children().Eq(1).Find("a").AttrOr("href", ""),
 			"date":  item.Children().Eq(3).Text(),
 		})
 	})
@@ -47,7 +47,7 @@ const theadSelector string = `thead > tr:nth-child(%d) > th:nth-child(%d)`
 const tbodySelector string = `tbody > tr:nth-child(%d) > td:nth-child(%d)`
 
 func GetMealData(c *gin.Context) {
-	defaultURL := fmt.Sprintf("%s/uni_zelkova/uni_zelkova_4_3_first.aspx", consts.SkhuURL)
+	defaultURL := consts.SkhuURL + "/uni_zelkova/uni_zelkova_4_3_first.aspx"
 
 	var targetURL string
 	var optionData MealOption

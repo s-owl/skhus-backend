@@ -1,8 +1,8 @@
 package user
 
 import (
-	"os"
 	"context"
+	"os"
 	"testing"
 
 	"github.com/s-owl/skhus-backend/browser"

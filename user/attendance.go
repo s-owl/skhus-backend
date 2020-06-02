@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -20,7 +19,7 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
-var targetURL = fmt.Sprintf("%s/Gate/UniMainStudent.aspx", consts.ForestURL)
+var targetURL = consts.ForestURL + "/Gate/UniMainStudent.aspx"
 
 func GetCurrentAttendance(c *gin.Context) {
 	client := &http.Client{}
@@ -67,7 +66,7 @@ func GetAttendanceWithOptions(c *gin.Context) {
 				targets, _ := chromedp.Targets(ctx)
 				if len(targets) > 0 {
 					currentURL := targets[0].URL
-					fmt.Println("Page URL", currentURL)
+					log.Println("Page URL", currentURL)
 				}
 			}
 		}()
@@ -83,9 +82,9 @@ func GetAttendanceWithOptions(c *gin.Context) {
 				cookieParam.URL = targetURL
 				ok, err := cookieParam.Do(context)
 				if ok {
-					fmt.Println("Cookie Set")
+					log.Println("Cookie Set")
 				} else if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 				}
 			}
 
@@ -107,7 +106,7 @@ func GetAttendanceWithOptions(c *gin.Context) {
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		go func(data chan string) {
 			if ev, ok := ev.(*network.EventResponseReceived); ok {
-				fmt.Println(ev.Response.URL)
+				log.Println(ev.Response.URL)
 				if ev.Response.URL == targetURL {
 					var content string
 					chromedp.Run(ctx, chromedp.InnerHTML(`body`, &content, chromedp.ByQuery))
