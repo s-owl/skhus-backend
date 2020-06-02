@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+skhus-backend
 
 # Test binary, built with `go test -c`
 *.test
@@ -16,3 +17,7 @@ vendor/
 
 # Logs
 *.log
+
+# VIM swap file
+*.swp
+
