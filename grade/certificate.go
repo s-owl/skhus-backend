@@ -11,10 +11,36 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
-// Forest에서 학점을 가져온다.
-/*
-	{
-	}
+/* Forest에서 성적 증명서를 가져온다.
+{
+	"userinfo": [
+		{
+			"name":  "...",
+			"value": "...",
+		},
+		...
+	],
+	"details": [
+		{
+			"year":     "...",
+			"semester": "...",
+			"code":     "...",
+			"subject":  "...",
+			"type":     "...",
+			"credit":   "...",
+			"grade":    "...",
+		},
+		...
+	],
+	"summary": [
+		{
+			"type":   "...",
+			"credit": "...",
+		},
+		...
+	],
+	"date": "...",
+}
 */
 func GetGradeCertificate(c *gin.Context) {
 	// forest에 접근해서 html을 받아온다.
