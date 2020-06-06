@@ -23,7 +23,7 @@ docker build . --file Dockerfile --tag skhus-backend:latest
 docker run skhus-backend:latest
 ```
 [미리 빌드된 이미지][7]를 사용하여 실행도 가능합니다.   
-You can also run with [prebuilt images].   
+You can also run with [prebuilt images][7].   
 ```bash
 docker pull docker.pkg.github.com/s-owl/skhus-backend/backend:[tag]
 docker run docker.pkg.github.com/s-owl/skhus-backend/backend:[tag]
