@@ -7,8 +7,9 @@ steps:
     args: ['beta', 'run', 'deploy', 'skhus-backend-$BRANCH_NAME',
     '--image', 'asia.gcr.io/$PROJECT_ID/skhus-backend:$BRANCH_NAME',
     '--region', 'asia-northeast1',
-    '--memory', '1024Mi',
-    '--concurrency', '2',
+    '--memory', '1536Mi',
+    '--concurrency', '4',
+    '--cpu', '2',
     '--platform', 'managed',
     '--allow-unauthenticated',
     '--set-env-vars', 'GIN_MODE=release']
