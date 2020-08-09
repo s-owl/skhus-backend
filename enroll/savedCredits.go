@@ -11,6 +11,26 @@ import (
 	"github.com/s-owl/skhus-backend/tools"
 )
 
+/*
+학점 세이브 제도로 보관한 학점을 표시한다.
+{
+	"status": {
+		"accrued": "숫자"(발생한 학점),
+		"accured_criteria": "년도 학기"(이 학점이 누적된 시점),
+		"used": "숫자"(사용한 학점),
+		"used_criteria": "년도 학기"(이 학점이 사용된 시점),
+		"available": "숫자"(사용할 수 있는 학점)
+	},
+	"details": [
+		{
+			"year": "년도",
+			"semester": "학기",
+			"saved": "숫자"(저장된 학점),
+			"used": "숫자"(사용된 학점),
+		}, ...
+	],
+}
+*/
 func GetSavedCredits(c *gin.Context) {
 	targetURL := consts.ForestURL + "/Gate/SAM/Lecture/H/SSGH03S.aspx?&maincd=O&systemcd=S&seq=100"
 	client := &http.Client{}
