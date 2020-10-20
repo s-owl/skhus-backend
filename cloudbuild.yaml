@@ -6,7 +6,7 @@ steps:
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['beta', 'run', 'deploy', 'skhus-backend-$BRANCH_NAME',
     '--image', 'asia.gcr.io/$PROJECT_ID/skhus-backend:$BRANCH_NAME',
-    '--region', 'asia-northeast1',
+    '--region', 'asia-northeast3',
     '--memory', '1536Mi',
     '--concurrency', '4',
     '--cpu', '2',
